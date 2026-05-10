@@ -5,7 +5,6 @@
 
 //extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
-extern void Chassis_Bluetooth_RxPro(uint8_t *pBuf, uint16_t Size);
 
 uint16_t uart1_delay_count = 0;
 uint16_t uart2_delay_count = 0;
@@ -84,7 +83,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 //			HAL_UART_Receive_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
 //		}
 
-//		Chassis_Bluetooth_RxPro(uart1_rx_data, UART_RX_BUFFER_SIZE);
+//		BT_ProcessRxData(uart1_rx_data, UART_RX_BUFFER_SIZE);
 
 //		if (uart1_rx_data[0] == '1')
 //		{
@@ -116,7 +115,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 //			SCB_InvalidateDCache_by_Addr((uint32_t *)uart1_rx_data, UART_RX_BUFFER_SIZE);
 //		}
 
-//		Chassis_Bluetooth_RxPro(uart1_rx_data, Size);
+//		BT_ProcessRxData(uart1_rx_data, Size);
 
 //		if (uart1_rx_mode_temp == UART_IT_ToIdle_RX)
 //		{

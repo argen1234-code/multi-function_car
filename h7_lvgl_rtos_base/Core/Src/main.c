@@ -129,14 +129,14 @@ int main(void)
 
 	/* --- USB CDC 回环测试(阻塞RTOS启动) --- */
 	/* 电脑通过虚拟串口发什么,32就原样返回 */
-	while (1)
-	{
-		if (usb_rx_flag)
-		{
-			CDC_Transmit_FS(UserRxBufferFS, (uint16_t)usb_rx_len);
-			usb_rx_flag = 0;
-		}
-	}
+//	while (1)
+//	{
+//		if (usb_rx_flag)
+//		{
+//			CDC_Transmit_FS(UserRxBufferFS, (uint16_t)usb_rx_len);
+//			usb_rx_flag = 0;
+//		}
+//	}
 	/* --- 测试通过后注释掉上面的 while(1) --- */
 	
 

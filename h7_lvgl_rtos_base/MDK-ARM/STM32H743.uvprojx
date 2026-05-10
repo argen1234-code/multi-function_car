@@ -2978,6 +2978,16 @@
               <FileType>5</FileType>
               <FilePath>..\Middware\App\app_Navigation.h</FilePath>
             </File>
+            <File>
+              <FileName>app_remote_control.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Middware\App\app_remote_control.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_remote_control.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Middware\App\app_remote_control.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -3122,6 +3132,16 @@
               <FileName>bsp_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\Hardware\bsp_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_bluetooth.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_bluetooth.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_bluetooth.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_bluetooth.h</FilePath>
             </File>
           </Files>
         </Group>

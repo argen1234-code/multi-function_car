@@ -46,19 +46,16 @@ typedef struct {
     uint32_t dwell_start_tick;        // 到达航点时的系统时间戳 (用于计时停留)
 } Navigation_State_t;
 
-extern Navigation_State_t nav_state;
+/* 前向声明: 完整类型定义在 app_chassis_board.h */
+struct chassis_move_s;
 
-// 单目标导航（向后兼容，到了就停）
-void Navigation_Set_Target(double target_lat, double target_lon);
+/* ---- 航点设置 (仅操作 Navigation_State_t) ---- */
+void Navigation_Set_Target(Navigation_State_t *nav, double target_lat, double target_lon);
+void Navigation_Set_Route(Navigation_State_t *nav, GPS_Point_t *waypoints, uint8_t count);
+void Navigation_Set_Route_Loop(Navigation_State_t *nav, GPS_Point_t *waypoints, uint8_t count);
 
-// 多目标巡航：传入航点数组和数量，按顺序逐个前往
-// 每个中间航点到达后停留 WAYPOINT_DWELL_MS 毫秒，最后一个航点到达后直接停车
-void Navigation_Set_Route(GPS_Point_t *waypoints, uint8_t count);
-
-// 循环巡航：最后一个航点完成后会自动回到第一个航点继续运行
-void Navigation_Set_Route_Loop(GPS_Point_t *waypoints, uint8_t count);
-
-void Navigation_Stop(void);
-void Navigation_Update_Loop(void);
+/* ---- 导航控制 (需要底盘指针以读取IMU / 写入VxVyWz) ---- */
+void Navigation_Stop(struct chassis_move_s *chassis);
+void Navigation_Update_Loop(struct chassis_move_s *chassis);
 
 #endif
