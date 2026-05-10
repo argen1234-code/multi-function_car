@@ -96,6 +96,9 @@ PA12     ------> USB_DP
 PB8			------>I2C1_SCL 
 PB9			------>I2C1_SDA
 
+//蓝牙
+PA9     ------> usart1_tx
+PA10     ------> usart1_rx
 
 //---GPS---
 PA2			------>USART2_TX
