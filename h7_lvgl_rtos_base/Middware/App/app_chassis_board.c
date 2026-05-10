@@ -1,6 +1,7 @@
 #include "app_chassis_board.h"
 #include "app_Navigation.h"
 #include "app_remote_control.h"
+#include "usbd_cdc_if.h"
 #include "cmsis_os.h"
 #include "bsp_uart.h"
 #include "bsp_encoder.h"
@@ -21,6 +22,9 @@ static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
 
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
 static chassis_move_t    chassis_move    = {0};
+
+/* Keil Watch 调试: 直接输入 chassis_debug 即可展开结构体 */
+chassis_move_t *const chassis_debug = &chassis_move;
 
 
 /* ============================================================
@@ -77,6 +81,14 @@ void chassis_feedback_update(chassis_move_t *chassis)
     {
         chassis->motor[i].speed = Encoder_Rpm_Get(i);
     }
+
+    /* USB /cmd_vel → chassis->cmd_vel */
+    if (usb_rx_flag)
+    {
+        USB_ProcessRxData(UserRxBufferFS, (uint16_t)usb_rx_len);
+        usb_rx_flag = 0;
+    }
+    chassis->cmd_vel = USB_GetCmdVel();
 }
 
 /* ============================================================
@@ -95,6 +107,7 @@ static void chassis_init(chassis_move_t *chassis)
     Encoder_Init();
     Motor_Init();
     BT_Init();
+    USB_Init();
     uart_init(&huart1, UART_DMA_ToIdle_RX);
     uart_init(&huart2, UART_DMA_ToIdle_RX);
 
@@ -193,7 +206,7 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
-    QMC5883_Init();
+//    QMC5883_Init();
     GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */

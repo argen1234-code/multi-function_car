@@ -4,6 +4,7 @@
 #include "main.h"
 #include "pid.h"
 #include "bsp_QMC5883.h"
+#include "bsp_usb.h"
 #include "app_Navigation.h"
 
 #define chassis_board_task 1
@@ -78,6 +79,9 @@ typedef struct chassis_move_s {
 
     /* ---- 工作模式 ---- */
     CarMode_t           mode;      /* 当前模式 */
+
+    /* ---- USB 下发的 /cmd_vel 速度指令 ---- */
+    cmd_vel_t           cmd_vel;   /* Jetson → STM32 */
 
     /* ---- 全向移动目标速度 (运动学分解前的合速度) ---- */
     float Vx_set;                  /* X 轴目标速度  (纵向) */

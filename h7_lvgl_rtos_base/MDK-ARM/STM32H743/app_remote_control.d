@@ -49,5 +49,6 @@ stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ha
 stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\app_remote_control.o: ..\Drivers\Algorithm\pid.h
 stm32h743\app_remote_control.o: ..\Drivers\Hardware\bsp_QMC5883.h
+stm32h743\app_remote_control.o: ..\Drivers\Hardware\bsp_usb.h
 stm32h743\app_remote_control.o: ..\Middware\App\app_Navigation.h
 stm32h743\app_remote_control.o: ..\Drivers\Hardware\bsp_bluetooth.h

@@ -245,6 +245,7 @@
 "stm32h743\bsp_gps.o"
 "stm32h743\bsp_uart.o"
 "stm32h743\bsp_bluetooth.o"
+"stm32h743\bsp_usb.o"
 "stm32h743\pid.o"
 "stm32h743\usb_device.o"
 "stm32h743\usbd_cdc_if.o"

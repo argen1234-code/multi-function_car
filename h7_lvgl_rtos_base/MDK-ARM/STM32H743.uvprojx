@@ -3143,6 +3143,16 @@
               <FileType>5</FileType>
               <FilePath>..\Drivers\Hardware\bsp_bluetooth.h</FilePath>
             </File>
+            <File>
+              <FileName>bsp_usb.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_usb.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_usb.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_usb.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
