@@ -40,3 +40,7 @@ stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_
 stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
+stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
+stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
+stm32h743\stm32h7xx_hal_tim_ex.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h

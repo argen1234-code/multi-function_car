@@ -41,6 +41,10 @@ stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ti
 stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
+stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
+stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
+stm32h743\app_navigation.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\app_navigation.o: ..\Drivers\Hardware\bsp_GPS.h
 stm32h743\app_navigation.o: ../Core/Inc/main.h
 stm32h743\app_navigation.o: ..\Middware\App\app_Chassis_board.h

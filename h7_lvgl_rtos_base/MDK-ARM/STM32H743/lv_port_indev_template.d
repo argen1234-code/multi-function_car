@@ -170,4 +170,8 @@ stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7x
 stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
+stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
+stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
+stm32h743\lv_port_indev_template.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\lv_port_indev_template.o: ../Drivers/User/Inc/touch_iic.h

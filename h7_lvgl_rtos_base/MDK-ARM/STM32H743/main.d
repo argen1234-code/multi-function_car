@@ -41,6 +41,10 @@ stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
+stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
+stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
+stm32h743\main.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\main.o: ../Drivers/User/Inc/touch_iic.h
 stm32h743\main.o: ../Drivers/User/Inc/lcd_rgb.h
 stm32h743\main.o: ../Drivers/User/Inc/sdram.h
@@ -185,6 +189,16 @@ stm32h743\main.o: ../Drivers/User/Inc/gpio.h
 stm32h743\main.o: ../Drivers/User/Inc/usart.h
 stm32h743\main.o: ../Drivers/User/Inc/dma.h
 stm32h743\main.o: ../Drivers/User/Inc/i2c.h
+stm32h743\main.o: ..\USB_DEVICE\App\usb_device.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_def.h
+stm32h743\main.o: ..\USB_DEVICE\Target\usbd_conf.h
+stm32h743\main.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+stm32h743\main.o: ..\USB_DEVICE\App\usbd_cdc_if.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Class\CDC\Inc\usbd_cdc.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ioreq.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_core.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ioreq.h
+stm32h743\main.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ctlreq.h
 stm32h743\main.o: ..\Middware\LVGL\examples\porting\lv_port_disp_template.h
 stm32h743\main.o: ..\Middware\LVGL\examples\porting\lv_port_indev_template.h
 stm32h743\main.o: ..\Middware\App\my_lvgl_task.h

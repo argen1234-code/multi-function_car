@@ -50,6 +50,10 @@ stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h
 stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim_ex.h
 stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart.h
 stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_uart_ex.h
+stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
+stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
+stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
+stm32h743\freertos.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\freertos.o: ..\Middware\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os.h
 stm32h743\freertos.o: ..\Middware\Third_Party\FreeRTOS\Source\CMSIS_RTOS_V2\cmsis_os2.h
 stm32h743\freertos.o: ..\Middware\App\my_lvgl_task.h

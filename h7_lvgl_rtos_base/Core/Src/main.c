@@ -10,6 +10,8 @@
 #include "usart.h"
 #include "dma.h"
 #include "i2c.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 #include "lvgl.h"
 #include "lv_port_disp_template.h"
@@ -32,7 +34,7 @@ void MX_FREERTOS_Init(void);
 ****************************************************************************************************/
 
 /*已使用引脚
-PC13(LED),PA15(KEY),PB10,PB11(OLED),PB12 13 ,14 15, PA11,12  PC11,12(MOTOR_DIR)
+PC13(LED),PA15(KEY),PB10,PB11(OLED),PB12 13 ,14 15,  PC11,12(MOTOR_DIR)
 
 PB3     ------> TIM2_CH2
 PA5     ------> TIM2_CH1
@@ -86,8 +88,8 @@ PG3(TOUCH SCL),PG7(TOUCH SDA),PI10, PI11,没在cubemx初始化 注意
 PC10     ------> UART4_TX
 PH14     ------> UART4_RX
 
-PA10     ------> USART1_RX
-PA9     ------> USART1_TX
+PA11     ------> USB_DM
+PA12     ------> USB_DP
 
 
 //---磁力计----
@@ -114,7 +116,6 @@ int main(void)
 	MX_DMA_Init();
   MX_TIM2_Init();    //编码器
   MX_TIM4_Init();    //编码器
-  MX_USART1_UART_Init();
 	MX_USART2_UART_Init();//GPS模块使用串口2
 	MX_UART4_Init();   //串口读取jy61p数据
   MX_TIM3_Init();   //编码器
@@ -124,6 +125,19 @@ int main(void)
 	
 	LED_Init();					// 初始化LED引脚
 	MX_FMC_Init();				// SDRAM初始化
+	MX_USB_DEVICE_Init();		// USB设备初始化
+
+	/* --- USB CDC 回环测试(阻塞RTOS启动) --- */
+	/* 电脑通过虚拟串口发什么,32就原样返回 */
+	while (1)
+	{
+		if (usb_rx_flag)
+		{
+			CDC_Transmit_FS(UserRxBufferFS, (uint16_t)usb_rx_len);
+			usb_rx_flag = 0;
+		}
+	}
+	/* --- 测试通过后注释掉上面的 while(1) --- */
 	
 
 
