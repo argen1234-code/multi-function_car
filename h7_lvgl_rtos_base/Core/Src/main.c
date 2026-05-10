@@ -116,6 +116,7 @@ int main(void)
 	MX_DMA_Init();
   MX_TIM2_Init();    //编码器
   MX_TIM4_Init();    //编码器
+	MX_USART1_UART_Init();//蓝牙模块使用串口1
 	MX_USART2_UART_Init();//GPS模块使用串口2
 	MX_UART4_Init();   //串口读取jy61p数据
   MX_TIM3_Init();   //编码器

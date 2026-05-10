@@ -95,7 +95,7 @@ static void chassis_init(chassis_move_t *chassis)
     Encoder_Init();
     Motor_Init();
     BT_Init();
-//  uart_init(&huart1, UART_DMA_ToIdle_RX);
+    uart_init(&huart1, UART_DMA_ToIdle_RX);
     uart_init(&huart2, UART_DMA_ToIdle_RX);
 
     for (uint8_t i = 0; i < 4; i++)

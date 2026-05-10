@@ -47,5 +47,6 @@ stm32h743\bsp_uart.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
 stm32h743\bsp_uart.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
 stm32h743\bsp_uart.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
 stm32h743\bsp_uart.o: ..\Drivers\Hardware\bsp_GPS.h
+stm32h743\bsp_uart.o: ..\Drivers\Hardware\bsp_bluetooth.h
 stm32h743\bsp_uart.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 stm32h743\bsp_uart.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdarg.h
