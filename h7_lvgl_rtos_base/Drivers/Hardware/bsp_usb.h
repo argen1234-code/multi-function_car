@@ -3,7 +3,7 @@
 
 #include "main.h"
 
-/* Jetson 下发的 /cmd_vel 速度指令 */
+/* Jetson 下发的 /cmd_vel 速度指令 */ //范围绝对值都小于1
 typedef struct {
     float vx;      /* 线速度 (m/s), 正值前进 */
     float vz;      /* 角速度 (rad/s), 正值左转 (Z轴向上) */

@@ -232,8 +232,26 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     float out_vx = target_v * cosf(rad_err);
     float out_vy = target_v * sinf(rad_err);
 
-    /* b. 航向 → 旋转速度 (P控) */
-    float out_wz = angle_diff * Kp_yaw;
+    /* b. 航向 → 旋转速度 */
+
+    /* GPS 航向基值 (P控) */
+    float gps_wz = angle_diff * Kp_yaw;
+    if (gps_wz >  Max_wz) gps_wz =  Max_wz;
+    if (gps_wz < -Max_wz) gps_wz = -Max_wz;
+
+    /* ROS cmd_vel.vz (Jetson 路径规划 + 避障) */
+    float ros_vz = chassis->cmd_vel.vz;
+
+    /* 融合: ROS 有有效指令时优先避障, 否则纯 GPS 航向控制 */
+    float out_wz;
+    if (fabsf(ros_vz) > 0.01f)
+    {
+        out_wz = ros_vz + gps_wz * 0.3f;
+    }
+    else
+    {
+        out_wz = gps_wz;
+    }
     if (out_wz >  Max_wz) out_wz =  Max_wz;
     if (out_wz < -Max_wz) out_wz = -Max_wz;
 
