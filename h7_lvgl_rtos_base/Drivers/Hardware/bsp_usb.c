@@ -1,7 +1,9 @@
 #include "bsp_usb.h"
+#include "usbd_cdc_if.h"
 #include <string.h>
 
-#define CMD_VEL_FRAME_SIZE  11U
+#define CMD_VEL_FRAME_SIZE   11U
+#define TELEM_FRAME_SIZE     7U
 
 static uint8_t   rx_buf[CMD_VEL_FRAME_SIZE];
 static uint8_t   rx_idx = 0;
@@ -57,4 +59,18 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
 cmd_vel_t USB_GetCmdVel(void)
 {
     return cmd_vel;
+}
+
+void USB_SendTelemetry(float heading_to_target_deg)
+{
+    uint8_t buf[TELEM_FRAME_SIZE];
+    buf[0] = 0xAA;
+    buf[1] = 0x55;
+    memcpy(&buf[2], &heading_to_target_deg, 4);
+
+    uint8_t checksum = 0;
+    for (uint8_t i = 2; i < 6; i++) checksum ^= buf[i];
+    buf[6] = checksum;
+
+    CDC_Transmit_FS(buf, TELEM_FRAME_SIZE);
 }

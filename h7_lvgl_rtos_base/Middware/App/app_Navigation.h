@@ -57,5 +57,6 @@ void Navigation_Set_Route_Loop(Navigation_State_t *nav, GPS_Point_t *waypoints, 
 /* ---- 导航控制 (需要底盘指针以读取IMU / 写入VxVyWz) ---- */
 void Navigation_Stop(struct chassis_move_s *chassis);
 void Navigation_Update_Loop(struct chassis_move_s *chassis);
+void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis);
 
 #endif

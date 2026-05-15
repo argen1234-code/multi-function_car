@@ -16,6 +16,7 @@ typedef enum {
 typedef enum {
     BT_MODE_REQ_NONE = 0,
     BT_MODE_REQ_GPS,
+    BT_MODE_REQ_GPS_ROS,
     BT_MODE_REQ_INDOOR
 } BT_ModeReq_t;
 

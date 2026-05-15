@@ -67,9 +67,18 @@ typedef struct {
  * ============================================================ */
 
 typedef enum {
-    CAR_MODE_GPS = 0,          /* GPS 自主导航 */
+    CAR_MODE_GPS = 0,          /* GPS 纯导航 */
+    CAR_MODE_GPS_ROS,          /* GPS + ROS cmd_vel 融合导航 */
     CAR_MODE_INDOOR            /* 蓝牙室内遥控 */
 } CarMode_t;
+
+/* ============================================================
+ *  USB 回传数据 (STM32 → Jetson)
+ * ============================================================ */
+
+typedef struct {
+    float heading_to_target_deg;   /* 目标相对车头方位: 0°=正前, 90°=右侧, 180°=后方, 270°=左侧, 顺时针为正 [0,360) */
+} date_to_usb_t;
 
 /* ============================================================
  *  底盘全向移动总控制结构体
@@ -88,6 +97,9 @@ typedef struct chassis_move_s {
 
     /* ---- USB 下发的 /cmd_vel 速度指令 ---- */
     cmd_vel_t           cmd_vel;   /* Jetson → STM32 */
+
+    /* ---- USB 回传数据 ---- */
+    date_to_usb_t       date_to_usb; /* STM32 → Jetson */
 
     /* ---- 全向移动目标速度 (运动学分解前的合速度) ---- */
     float Vx_set;                  /* X 轴目标速度  (纵向) */

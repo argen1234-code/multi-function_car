@@ -52,13 +52,13 @@ static void chassis_start_gps_navigation(chassis_move_t *chassis)
 void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode)
 {
     if (chassis == NULL) return;
-    if (mode != CAR_MODE_GPS && mode != CAR_MODE_INDOOR) return;
+    if (mode != CAR_MODE_GPS && mode != CAR_MODE_GPS_ROS && mode != CAR_MODE_INDOOR) return;
 
     Navigation_Stop(chassis);
     chassis_stop(chassis);
     chassis->mode = mode;
 
-    if (mode == CAR_MODE_GPS)
+    if (mode == CAR_MODE_GPS || mode == CAR_MODE_GPS_ROS)
     {
         chassis_start_gps_navigation(chassis);
     }
@@ -88,6 +88,16 @@ void chassis_feedback_update(chassis_move_t *chassis)
         usb_rx_flag = 0;
     }
     chassis->cmd_vel = USB_GetCmdVel();
+
+    /* 目标相对于车头的方位角 [0, 360), 顺时针为正 (0°=正前, 90°=右侧, 270°=左侧) */
+    {
+        float tgt = chassis->nav.target_bearing;   /* GPS 目标绝对方位角 (0=北, 90=东) */
+        float yaw = chassis->imu.mag.yaw;          /* 磁力计车头朝向 (0=北, 90=东, 顺时针增) */
+        float diff = tgt - yaw;                    /* 正=目标在右, 负=目标在左 */
+        while (diff < 0.0f)    diff += 360.0f;
+        while (diff >= 360.0f) diff -= 360.0f;
+        chassis->date_to_usb.heading_to_target_deg = diff;
+    }
 }
 
 /* ============================================================
@@ -159,6 +169,10 @@ void chassis_mode_change(chassis_move_t *chassis)
             Chassis_SetMode(chassis, CAR_MODE_GPS);
             break;
 
+        case BT_MODE_REQ_GPS_ROS:
+            Chassis_SetMode(chassis, CAR_MODE_GPS_ROS);
+            break;
+
         case BT_MODE_REQ_INDOOR:
             Chassis_SetMode(chassis, CAR_MODE_INDOOR);
             break;
@@ -180,11 +194,15 @@ void chassis_set_control(chassis_move_t *chassis)
 {
     if (chassis->mode == CAR_MODE_GPS)
     {
-        Navigation_Update_Loop(chassis);     /* GPS 导航  写入 Vx/Vy/Wz */
+        Navigation_Update_Loop(chassis);         /* 纯 GPS 导航 */
+    }
+    else if (chassis->mode == CAR_MODE_GPS_ROS)
+    {
+        Navigation_Update_Loop_Fusion(chassis);  /* GPS + ROS 融合导航 */
     }
     else
     {
-        Remote_Control_Update(chassis);      /* 蓝牙遥控  写入 Vx/Vy/Wz */
+        Remote_Control_Update(chassis);          /* 蓝牙遥控 */
     }
 		
 		//由于雷达和之前车头反方向，故增添取反
@@ -205,7 +223,7 @@ void chassis_send_cmd(chassis_move_t *chassis)
         Motor_SetPWM((int16_t)chassis->motor[i].speed_pid.Out, i);
     }
 
-    /* TODO: 舵机 / CAN / 遥测数据上报 */
+    USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg);
 }
 
 

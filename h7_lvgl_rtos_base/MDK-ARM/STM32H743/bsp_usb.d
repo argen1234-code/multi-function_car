@@ -46,4 +46,14 @@ stm32h743\bsp_usb.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h
 stm32h743\bsp_usb.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
 stm32h743\bsp_usb.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
 stm32h743\bsp_usb.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
+stm32h743\bsp_usb.o: ..\USB_DEVICE\App\usbd_cdc_if.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Class\CDC\Inc\usbd_cdc.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ioreq.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_def.h
+stm32h743\bsp_usb.o: ..\USB_DEVICE\Target\usbd_conf.h
+stm32h743\bsp_usb.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
+stm32h743\bsp_usb.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
 stm32h743\bsp_usb.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_core.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ioreq.h
+stm32h743\bsp_usb.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ctlreq.h

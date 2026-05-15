@@ -222,7 +222,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     while (angle_diff <= -180.0f) angle_diff += 360.0f;
     nav->heading_error = angle_diff;
 
-    /* 6. 全向平移动力学拆解 (Crab Walk) */
+    /* 6. 纯 GPS 蟹行 (Crab Walk) */
 
     /* a. 距离 → 平移速度 (P控) */
     float target_v = nav->distance_error * Kp_dist;
@@ -232,30 +232,141 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     float out_vx = target_v * cosf(rad_err);
     float out_vy = target_v * sinf(rad_err);
 
-    /* b. 航向 → 旋转速度 */
-
-    /* GPS 航向基值 (P控) */
-    float gps_wz = angle_diff * Kp_yaw;
-    if (gps_wz >  Max_wz) gps_wz =  Max_wz;
-    if (gps_wz < -Max_wz) gps_wz = -Max_wz;
-
-    /* ROS cmd_vel.vz (Jetson 路径规划 + 避障) */
-    float ros_vz = chassis->cmd_vel.vz;
-
-    /* 融合: ROS 有有效指令时优先避障, 否则纯 GPS 航向控制 */
-    float out_wz;
-    if (fabsf(ros_vz) > 0.01f)
-    {
-        out_wz = ros_vz + gps_wz * 0.3f;
-    }
-    else
-    {
-        out_wz = gps_wz;
-    }
+    /* b. 航向 → 旋转速度 (P控) */
+    float out_wz = angle_diff * Kp_yaw;
     if (out_wz >  Max_wz) out_wz =  Max_wz;
     if (out_wz < -Max_wz) out_wz = -Max_wz;
 
     /* 7. 输出到底盘结构体 */
+    chassis->Vx_set = out_vx;
+    chassis->Vy_set = out_vy;
+    chassis->Wz_set = out_wz;
+}
+
+/* ============================================================
+ *  公开: GPS + ROS cmd_vel 融合导航 (每周期调用一次)
+ *        ROS cmd_vel 来自 Jetson 融合了 heading_to_target_deg
+ *        的路径规划输出 (虚拟目标点 3m 前推 + 避障),
+ *        本函数保留 GPS 航点管理, 以 ROS 指令为主控,
+ *        ROS 无指令时自动回退为纯 GPS 蟹行
+ * ============================================================ */
+#define ROS_VX_SCALE  100.0f   /* cmd_vel.vx (m/s) → 内部 RPM */
+#define ROS_VZ_SCALE   30.0f   /* cmd_vel.vz (rad/s) → 内部 RPM */
+
+void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
+{
+    if (chassis == NULL) return;
+
+    Navigation_State_t *nav = &chassis->nav;
+
+    if (!nav->is_navigating) return;
+
+    /* ---- 停留等待阶段 (同纯GPS) ---- */
+    if (nav->phase == NAV_PHASE_DWELLING) {
+        chassis->Vx_set = 0.0f;
+        chassis->Vy_set = 0.0f;
+        chassis->Wz_set = 0.0f;
+
+        if (HAL_GetTick() - nav->dwell_start_tick >= WAYPOINT_DWELL_MS) {
+            if (nav->current_wp_index + 1 >= nav->total_waypoints) {
+                nav->current_wp_index = 0;
+            } else {
+                nav->current_wp_index++;
+            }
+            nav->target_pos = nav->route[nav->current_wp_index];
+            nav->phase      = NAV_PHASE_RUNNING;
+        }
+        return;
+    }
+
+    /* ---- 行驶阶段 ---- */
+
+    /* 1. 读取 GPS 定位 */
+    PT_GNGGA pGGA = GetGNGGA();
+    PT_GPHPR pHPR = GetGPHPR();
+
+    if (pGGA->qf < 1 || pGGA->lat < 1.0f) {
+        chassis->Vx_set = 0.0f;
+        chassis->Vy_set = 0.0f;
+        chassis->Wz_set = 0.0f;
+        return;
+    }
+
+    nav->rtk_quality  = pGGA->qf;
+    nav->current_pos.lat = NMEA_To_Degree(pGGA->lat);
+    nav->current_pos.lon = NMEA_To_Degree(pGGA->lon);
+
+    nav->current_heading = chassis->imu.mag.yaw;
+
+    /* 2. 计算目标方位角与距离 (用于航点管理与遥测) */
+    nav->target_bearing = Calculate_Bearing(
+        nav->current_pos.lat, nav->current_pos.lon,
+        nav->target_pos.lat,   nav->target_pos.lon);
+    nav->distance_error = Calculate_Distance(
+        nav->current_pos.lat, nav->current_pos.lon,
+        nav->target_pos.lat,   nav->target_pos.lon);
+
+    /* 航向偏差 (归一化到 -180 ~ +180) */
+    float angle_diff = nav->target_bearing - nav->current_heading;
+    while (angle_diff >  180.0f) angle_diff -= 360.0f;
+    while (angle_diff <= -180.0f) angle_diff += 360.0f;
+    nav->heading_error = angle_diff;
+
+    /* 3. 到达判断 */
+    if (nav->distance_error < 2.0f) {
+        chassis->Vx_set = 0.0f;
+        chassis->Vy_set = 0.0f;
+        chassis->Wz_set = 0.0f;
+
+        if (nav->current_wp_index + 1 >= nav->total_waypoints) {
+            if (nav->loop_enable && nav->total_waypoints > 1) {
+                nav->dwell_start_tick = HAL_GetTick();
+                nav->phase = NAV_PHASE_DWELLING;
+            } else {
+                Navigation_Stop(chassis);
+            }
+        } else {
+            nav->dwell_start_tick = HAL_GetTick();
+            nav->phase = NAV_PHASE_DWELLING;
+        }
+        return;
+    }
+
+    /* 4. 融合: ROS cmd_vel 为主控, GPS 蟹行为回退 */
+
+    float ros_vx = chassis->cmd_vel.vx;
+    float ros_vz = chassis->cmd_vel.vz;
+    float out_vx, out_wz;
+
+    if (fabsf(ros_vx) > 0.01f)
+    {
+        /* ROS 有有效前向指令 → 使用 ROS 规划结果 */
+        out_vx = ros_vx * ROS_VX_SCALE;
+    }
+    else
+    {
+        /* ROS 无指令 → GPS 距离 P 控 */
+        out_vx = nav->distance_error * Kp_dist;
+    }
+    if (out_vx > Max_speed) out_vx = Max_speed;
+
+    /* 横向: 融合模式不使用蟹行, 仅向前 */
+    float out_vy = 0.0f;
+
+    if (fabsf(ros_vz) > 0.01f)
+    {
+        /* ROS 有有效旋转指令 → 使用 ROS 避障规划 */
+        out_wz = ros_vz * ROS_VZ_SCALE;
+    }
+    else
+    {
+        /* ROS 无指令 → GPS 航向 P 控 */
+        out_wz = angle_diff * Kp_yaw;
+    }
+    if (out_wz >  Max_wz) out_wz =  Max_wz;
+    if (out_wz < -Max_wz) out_wz = -Max_wz;
+
+    /* 5. 输出到底盘结构体 */
     chassis->Vx_set = out_vx;
     chassis->Vy_set = out_vy;
     chassis->Wz_set = out_wz;

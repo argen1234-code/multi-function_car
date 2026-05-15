@@ -9,8 +9,9 @@ typedef struct {
     float vz;      /* 角速度 (rad/s), 正值左转 (Z轴向上) */
 } cmd_vel_t;
 
-void       USB_Init(void);
-void       USB_ProcessRxData(uint8_t *pBuf, uint16_t Size);
-cmd_vel_t  USB_GetCmdVel(void);
+void          USB_Init(void);
+void          USB_ProcessRxData(uint8_t *pBuf, uint16_t Size);
+cmd_vel_t     USB_GetCmdVel(void);
+void          USB_SendTelemetry(float heading_to_target_deg);
 
 #endif

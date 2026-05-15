@@ -30,6 +30,11 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 bt_mode_req = BT_MODE_REQ_GPS;
                 break;
 
+            case 'O':
+            case 'o':
+                bt_mode_req = BT_MODE_REQ_GPS_ROS;
+                break;
+
             case 'I':
             case 'i':
                 bt_mode_req  = BT_MODE_REQ_INDOOR;
