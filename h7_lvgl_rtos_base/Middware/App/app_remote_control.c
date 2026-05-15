@@ -3,6 +3,16 @@
 
 #define BT_REMOTE_SPEED  20.0f
 
+/* 微信遥控 cmd_vel 缩放 (m/s / rad/s → 内部 RPM) */
+#define WECHAT_VX_SCALE  100.0f
+#define WECHAT_VZ_SCALE   30.0f
+#define WECHAT_MAX_SPEED  50.0f
+#define WECHAT_MAX_WZ     25.0f
+
+/* ============================================================
+ *  蓝牙遥控 (最高优先级)
+ *  方向键 → Vx_set / Wz_set
+ * ============================================================ */
 void Remote_Control_Update(chassis_move_t *chassis)
 {
     switch (BT_GetMotion())
@@ -38,4 +48,24 @@ void Remote_Control_Update(chassis_move_t *chassis)
             chassis->Wz_set = 0.0f;
             break;
     }
+}
+
+/* ============================================================
+ *  微信小程序遥控 (第二优先级)
+ *  Jetson 转发来的 cmd_vel, mode=2
+ *  vx → 前向速度, vz → 旋转速度
+ * ============================================================ */
+void Remote_WeChat_Update(chassis_move_t *chassis)
+{
+    float out_vx = chassis->cmd_vel.vx * WECHAT_VX_SCALE;
+    float out_wz = chassis->cmd_vel.vz * WECHAT_VZ_SCALE;
+
+    if (out_vx >  WECHAT_MAX_SPEED) out_vx =  WECHAT_MAX_SPEED;
+    if (out_vx < -WECHAT_MAX_SPEED) out_vx = -WECHAT_MAX_SPEED;
+    if (out_wz >  WECHAT_MAX_WZ)    out_wz =  WECHAT_MAX_WZ;
+    if (out_wz < -WECHAT_MAX_WZ)    out_wz = -WECHAT_MAX_WZ;
+
+    chassis->Vx_set = out_vx;
+    chassis->Vy_set = 0.0f;
+    chassis->Wz_set = out_wz;
 }

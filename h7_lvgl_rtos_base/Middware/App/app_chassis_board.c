@@ -13,10 +13,13 @@
 /* ---- GPS 航点数量 ---- */
 #define CHASSIS_GPS_ROUTE_COUNT  2U
 
+/* ---- Jetson 超时 (ms), 超过此时间无有效帧视为离线 ---- */
+#define JETSON_TIMEOUT_MS  500U
+
 /* ---- 预设 GPS 巡航路线 ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
     {26.449591, 106.650651},
-		{26.449820,	106.650896}
+    {26.449820, 106.650896}
 };
 
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
@@ -52,20 +55,19 @@ static void chassis_start_gps_navigation(chassis_move_t *chassis)
 void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode)
 {
     if (chassis == NULL) return;
-    if (mode != CAR_MODE_GPS && mode != CAR_MODE_GPS_ROS && mode != CAR_MODE_INDOOR) return;
 
     Navigation_Stop(chassis);
     chassis_stop(chassis);
     chassis->mode = mode;
 
-    if (mode == CAR_MODE_GPS || mode == CAR_MODE_GPS_ROS)
+    if (mode == CAR_MODE_GPS)
     {
         chassis_start_gps_navigation(chassis);
     }
 }
 
 /* ============================================================
- *  传感器数据刷新: 磁力计 + 编码器
+ *  传感器数据刷新: 磁力计 + 编码器 + USB
  *  每周期在控制循环之前调用
  * ============================================================ */
 void chassis_feedback_update(chassis_move_t *chassis)
@@ -81,19 +83,23 @@ void chassis_feedback_update(chassis_move_t *chassis)
         chassis->motor[i].speed = Encoder_Rpm_Get(i);
     }
 
-    /* USB /cmd_vel → chassis->cmd_vel */
+    /* USB Jetson 12字节帧 → chassis->cmd_vel */
     if (usb_rx_flag)
     {
         USB_ProcessRxData(UserRxBufferFS, (uint16_t)usb_rx_len);
         usb_rx_flag = 0;
     }
     chassis->cmd_vel = USB_GetCmdVel();
-
-    /* 目标相对于车头的方位角 [0, 360), 顺时针为正 (0°=正前, 90°=右侧, 270°=左侧) */
+    if (chassis->cmd_vel.mode != 0)
     {
-        float tgt = chassis->nav.target_bearing;   /* GPS 目标绝对方位角 (0=北, 90=东) */
-        float yaw = chassis->imu.mag.yaw;          /* 磁力计车头朝向 (0=北, 90=东, 顺时针增) */
-        float diff = tgt - yaw;                    /* 正=目标在右, 负=目标在左 */
+        chassis->jetson_last_tick = HAL_GetTick();
+    }
+
+    /* 目标相对于车头的方位角 [0, 360) */
+    {
+        float tgt = chassis->nav.target_bearing;
+        float yaw = chassis->imu.mag.yaw;
+        float diff = tgt - yaw;
         while (diff < 0.0f)    diff += 360.0f;
         while (diff >= 360.0f) diff -= 360.0f;
         chassis->date_to_usb.heading_to_target_deg = diff;
@@ -127,10 +133,10 @@ static void chassis_init(chassis_move_t *chassis)
                  MOTOR_SPEED_PID_MAX_OUT,
                  MOTOR_SPEED_PID_MAX_IOUT);
     }
-		for (uint8_t i = 0; i < 4; i++)
+    for (uint8_t i = 0; i < 4; i++)
     {
-			chassis->motor[i].speed_set = 0;
-		}
+        chassis->motor[i].speed_set = 0;
+    }
 }
 
 /* ============================================================
@@ -156,8 +162,8 @@ void chassis_control_loop(chassis_move_t *chassis)
 }
 
 /* ============================================================
- *  步骤1: 底盘控制模式切换 / 数据过渡
- *  处理蓝牙下发的模式请求, 执行 GPS↔室内 模式切换
+ *  步骤1: 底盘控制模式切换
+ *  蓝牙模式切换 (仅 GPS / 室内遥控)
  * ============================================================ */
 void chassis_mode_change(chassis_move_t *chassis)
 {
@@ -169,10 +175,6 @@ void chassis_mode_change(chassis_move_t *chassis)
             Chassis_SetMode(chassis, CAR_MODE_GPS);
             break;
 
-        case BT_MODE_REQ_GPS_ROS:
-            Chassis_SetMode(chassis, CAR_MODE_GPS_ROS);
-            break;
-
         case BT_MODE_REQ_INDOOR:
             Chassis_SetMode(chassis, CAR_MODE_INDOOR);
             break;
@@ -180,41 +182,51 @@ void chassis_mode_change(chassis_move_t *chassis)
         default:
             break;
     }
-
-    /* TODO: 模式切换时的控制量平滑过渡 / 数据缓存等 */
 }
 
 /* ============================================================
- *  步骤3: 底盘控制量设置
- *  根据当前模式写入 Vx/Vy/Wz 目标值
- *    GPS模式  → Navigation_Update_Loop 导航解算
- *    室内模式 → Remote_Control_Update 蓝牙遥控
+ *  步骤3: 底盘控制量设置 (优先级: 蓝牙 > 微信 > GPS)
  * ============================================================ */
 void chassis_set_control(chassis_move_t *chassis)
 {
-    if (chassis->mode == CAR_MODE_GPS)
+    uint8_t jetson_online =
+        (HAL_GetTick() - chassis->jetson_last_tick < JETSON_TIMEOUT_MS);
+    uint8_t jetson_mode = chassis->cmd_vel.mode;
+
+    /* 1. 蓝牙遥控 — 最高优先级 */
+    if (BT_IsActive())
     {
-        Navigation_Update_Loop(chassis);         /* 纯 GPS 导航 */
+        chassis->mode = CAR_MODE_INDOOR;
+        Remote_Control_Update(chassis);
     }
-    else if (chassis->mode == CAR_MODE_GPS_ROS)
+    /* 2. 微信小程序遥控 (Jetson mode=2) */
+    else if (jetson_online && jetson_mode == JETSON_MODE_REMOTE)
     {
-        Navigation_Update_Loop_Fusion(chassis);  /* GPS + ROS 融合导航 */
+        chassis->mode = CAR_MODE_REMOTE;
+        Remote_WeChat_Update(chassis);
     }
+    /* 3. GPS + ROS 融合导航 (Jetson mode=1) */
+    else if (jetson_online && jetson_mode == JETSON_MODE_GPS)
+    {
+        chassis->mode = CAR_MODE_GPS;
+        Navigation_Update_Loop_Fusion(chassis);
+    }
+    /* 4. 默认: 纯 GPS 导航 */
     else
     {
-        Remote_Control_Update(chassis);          /* 蓝牙遥控 */
+        chassis->mode = CAR_MODE_GPS;
+        Navigation_Update_Loop(chassis);
     }
-		
-		//由于雷达和之前车头反方向，故增添取反
-		chassis->Vx_set=-chassis->Vx_set;
-		chassis->Vy_set=-chassis->Vy_set;
-		
-		
+
+    //由于雷达和之前车头反方向，故增添取反
+    chassis->Vx_set = -chassis->Vx_set;
+    chassis->Vy_set = -chassis->Vy_set;
 }
 
 /* ============================================================
  *  步骤5: 底盘控制指令发送
- *    PID 输出 → 电机PWM / 舵机 / CAN 等执行器
+ *    PID 输出 → 电机PWM
+ *    遥测数据 → USB 回传 Jetson
  * ============================================================ */
 void chassis_send_cmd(chassis_move_t *chassis)
 {
@@ -227,8 +239,6 @@ void chassis_send_cmd(chassis_move_t *chassis)
 }
 
 
-
-
 /* ============================================================
  *  FreeRTOS 任务入口
  * ============================================================ */
@@ -236,21 +246,18 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
-		//QMC5883_Init();
-   // GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
-    //chassis_start_gps_navigation(&chassis_move);
+    chassis_start_gps_navigation(&chassis_move);
 
     /* -- 主循环 (100Hz) -- */
     while (1)
     {
-        chassis_mode_change(&chassis_move);        /* 底盘控制模式切换 / 数据过渡 */
-        chassis_feedback_update(&chassis_move);   /* 传感器数据刷新 */
-				chassis_move.Vx_set=15;
-        //chassis_set_control(&chassis_move);      /* 底盘控制量设置 */
-        chassis_control_loop(&chassis_move);      /* 底盘核心控制循环 */
-        chassis_send_cmd(&chassis_move);                        /* 底盘控制指令发送 */
+        chassis_mode_change(&chassis_move);       /* 蓝牙模式切换请求 */
+        chassis_feedback_update(&chassis_move);   /* 传感器 + USB 数据刷新 */
+        chassis_set_control(&chassis_move);       /* 控制量设置 (优先级调度) */
+        chassis_control_loop(&chassis_move);      /* 运动学 + PID */
+        chassis_send_cmd(&chassis_move);          /* 电机输出 + USB遥测 */
         osDelay(10);
     }
 }

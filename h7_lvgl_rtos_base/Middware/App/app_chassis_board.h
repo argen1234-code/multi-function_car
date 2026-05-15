@@ -67,9 +67,9 @@ typedef struct {
  * ============================================================ */
 
 typedef enum {
-    CAR_MODE_GPS = 0,          /* GPS 纯导航 */
-    CAR_MODE_GPS_ROS,          /* GPS + ROS cmd_vel 融合导航 */
-    CAR_MODE_INDOOR            /* 蓝牙室内遥控 */
+    CAR_MODE_GPS = 0,          /* GPS 导航 (默认纯GPS, Jetson在线时融合ROS) */
+    CAR_MODE_REMOTE,           /* 微信小程序遥控 (Jetson转发) */
+    CAR_MODE_INDOOR            /* 蓝牙遥控 */
 } CarMode_t;
 
 /* ============================================================
@@ -95,8 +95,9 @@ typedef struct chassis_move_s {
     /* ---- 工作模式 ---- */
     CarMode_t           mode;      /* 当前模式 */
 
-    /* ---- USB 下发的 /cmd_vel 速度指令 ---- */
-    cmd_vel_t           cmd_vel;   /* Jetson → STM32 */
+    /* ---- USB 下发的 Jetson 数据 ---- */
+    cmd_vel_t           cmd_vel;        /* 最新帧解析结果 (mode + vx + vz) */
+    uint32_t            jetson_last_tick; /* 最后一次收到有效帧的时间戳 */
 
     /* ---- USB 回传数据 ---- */
     date_to_usb_t       date_to_usb; /* STM32 → Jetson */

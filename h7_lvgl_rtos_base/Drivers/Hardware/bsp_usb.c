@@ -2,17 +2,18 @@
 #include "usbd_cdc_if.h"
 #include <string.h>
 
-#define CMD_VEL_FRAME_SIZE   11U
-#define TELEM_FRAME_SIZE     7U
+#define CMD_VEL_FRAME_SIZE   12U
+#define TELEM_FRAME_SIZE      7U
 
 static uint8_t   rx_buf[CMD_VEL_FRAME_SIZE];
 static uint8_t   rx_idx = 0;
-static cmd_vel_t cmd_vel = {0.0f, 0.0f};
+static cmd_vel_t cmd_vel = {0, 0.0f, 0.0f};
 
 void USB_Init(void)
 {
     rx_idx = 0;
     memset(rx_buf, 0, sizeof(rx_buf));
+    cmd_vel.mode = 0;
     cmd_vel.vx = 0.0f;
     cmd_vel.vz = 0.0f;
 }
@@ -41,17 +42,18 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
         {
             rx_idx = 0;
 
-            /* XOR 校验: Byte2 ~ Byte9 */
+            /* XOR 校验: Byte2 ~ Byte10 (9 bytes) */
             uint8_t checksum = 0;
-            for (uint8_t j = 2; j < 10; j++)
+            for (uint8_t j = 2; j < 11; j++)
             {
                 checksum ^= rx_buf[j];
             }
-            if (checksum != rx_buf[10]) continue;
+            if (checksum != rx_buf[11]) continue;
 
-            /* 解析 (STM32 小端, 无需字节序转换) */
-            memcpy(&cmd_vel.vx, &rx_buf[2], 4);
-            memcpy(&cmd_vel.vz, &rx_buf[6], 4);
+            /* 解析: mode(1B) + vx(4B LE) + vz(4B LE) */
+            cmd_vel.mode = rx_buf[2];
+            memcpy(&cmd_vel.vx, &rx_buf[3], 4);
+            memcpy(&cmd_vel.vz, &rx_buf[7], 4);
         }
     }
 }

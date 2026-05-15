@@ -16,13 +16,13 @@ typedef enum {
 typedef enum {
     BT_MODE_REQ_NONE = 0,
     BT_MODE_REQ_GPS,
-    BT_MODE_REQ_GPS_ROS,
     BT_MODE_REQ_INDOOR
 } BT_ModeReq_t;
 
 void           BT_Init(void);
 void           BT_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 BT_Motion_t    BT_GetMotion(void);
+uint8_t        BT_IsActive(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
 
 #endif

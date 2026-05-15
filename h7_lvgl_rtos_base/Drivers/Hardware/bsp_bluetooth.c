@@ -30,11 +30,6 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 bt_mode_req = BT_MODE_REQ_GPS;
                 break;
 
-            case 'O':
-            case 'o':
-                bt_mode_req = BT_MODE_REQ_GPS_ROS;
-                break;
-
             case 'I':
             case 'i':
                 bt_mode_req  = BT_MODE_REQ_INDOOR;
@@ -58,13 +53,19 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
     }
 }
 
+/* Returns 1 if BT remote is actively sending motion commands */
+uint8_t BT_IsActive(void)
+{
+    if (bt_last_tick == 0U) return 0;
+    return (HAL_GetTick() - bt_last_tick < BT_REMOTE_TIMEOUT_MS) ? 1 : 0;
+}
+
 /* Returns current motion command, auto-fallback to STOP on timeout */
 BT_Motion_t BT_GetMotion(void)
 {
     uint8_t cmd = bt_cmd;
 
-    if (bt_last_tick == 0U ||
-        HAL_GetTick() - bt_last_tick > BT_REMOTE_TIMEOUT_MS)
+    if (!BT_IsActive())
     {
         cmd = 'S';
     }

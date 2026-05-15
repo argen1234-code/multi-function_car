@@ -4,5 +4,6 @@
 #include "app_chassis_board.h"
 
 void Remote_Control_Update(chassis_move_t *chassis);
+void Remote_WeChat_Update(chassis_move_t *chassis);
 
 #endif
