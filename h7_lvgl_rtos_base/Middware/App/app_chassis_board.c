@@ -11,13 +11,12 @@
 #include "usart.h"
 
 /* ---- GPS 航点数量 ---- */
-#define CHASSIS_GPS_ROUTE_COUNT  3U
+#define CHASSIS_GPS_ROUTE_COUNT  2U
 
 /* ---- 预设 GPS 巡航路线 ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
     {26.449591, 106.650651},
-    {26.449698, 106.650615},
-    {26.449820, 106.650896}
+		{26.449820,	106.650896}
 };
 
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
@@ -118,6 +117,10 @@ static void chassis_init(chassis_move_t *chassis)
                  MOTOR_SPEED_PID_MAX_OUT,
                  MOTOR_SPEED_PID_MAX_IOUT);
     }
+		for (uint8_t i = 0; i < 4; i++)
+    {
+			chassis->motor[i].speed_set = 0;
+		}
 }
 
 /* ============================================================
@@ -183,6 +186,12 @@ void chassis_set_control(chassis_move_t *chassis)
     {
         Remote_Control_Update(chassis);      /* 蓝牙遥控  写入 Vx/Vy/Wz */
     }
+		
+		//由于雷达和之前车头反方向，故增添取反
+		chassis->Vx_set=-chassis->Vx_set;
+		chassis->Vy_set=-chassis->Vy_set;
+		
+		
 }
 
 /* ============================================================
@@ -199,6 +208,9 @@ void chassis_send_cmd(chassis_move_t *chassis)
     /* TODO: 舵机 / CAN / 遥测数据上报 */
 }
 
+
+
+
 /* ============================================================
  *  FreeRTOS 任务入口
  * ============================================================ */
@@ -206,18 +218,19 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
-//    QMC5883_Init();
-    GPS_Init();
+		//QMC5883_Init();
+   // GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
-    chassis_start_gps_navigation(&chassis_move);
+    //chassis_start_gps_navigation(&chassis_move);
 
     /* -- 主循环 (100Hz) -- */
     while (1)
     {
         chassis_mode_change(&chassis_move);        /* 底盘控制模式切换 / 数据过渡 */
         chassis_feedback_update(&chassis_move);   /* 传感器数据刷新 */
-        chassis_set_control(&chassis_move);      /* 底盘控制量设置 */
+				chassis_move.Vx_set=15;
+        //chassis_set_control(&chassis_move);      /* 底盘控制量设置 */
         chassis_control_loop(&chassis_move);      /* 底盘核心控制循环 */
         chassis_send_cmd(&chassis_move);                        /* 底盘控制指令发送 */
         osDelay(10);
