@@ -20,6 +20,8 @@ typedef struct {
 void       USB_Init(void);
 void       USB_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 cmd_vel_t  USB_GetCmdVel(void);
-void       USB_SendTelemetry(float heading_to_target_deg);
+void       USB_SendTelemetry(float heading_to_target_deg,
+                             float current_lat,
+                             float current_lon);
 
 #endif

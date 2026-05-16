@@ -78,6 +78,8 @@ typedef enum {
 
 typedef struct {
     float heading_to_target_deg;   /* 目标相对车头方位: 0°=正前, 90°=右侧, 180°=后方, 270°=左侧, 顺时针为正 [0,360) */
+    float current_lat;             /* 当前纬度 (十进制) */
+    float current_lon;             /* 当前经度 (十进制) */
 } date_to_usb_t;
 
 /* ============================================================

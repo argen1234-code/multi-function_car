@@ -9,6 +9,7 @@
 #include "bsp_GPS.h"
 #include "bsp_bluetooth.h"
 #include "usart.h"
+#include <math.h>
 
 /* ---- GPS 航点数量 ---- */
 #define CHASSIS_GPS_ROUTE_COUNT  2U
@@ -93,6 +94,20 @@ void chassis_feedback_update(chassis_move_t *chassis)
     if (chassis->cmd_vel.mode != 0)
     {
         chassis->jetson_last_tick = HAL_GetTick();
+    }
+
+    /* GPS 定位 → chassis->date_to_usb (NMEA → 十进制) */
+    {
+        PT_GNGGA pGGA = GetGNGGA();
+        if (pGGA->qf >= 1 && pGGA->lat >= 1.0f)
+        {
+            double lat_deg = floor(pGGA->lat / 100.0)
+                           + (pGGA->lat - floor(pGGA->lat / 100.0) * 100.0) / 60.0;
+            double lon_deg = floor(pGGA->lon / 100.0)
+                           + (pGGA->lon - floor(pGGA->lon / 100.0) * 100.0) / 60.0;
+            chassis->date_to_usb.current_lat = (float)lat_deg;
+            chassis->date_to_usb.current_lon = (float)lon_deg;
+        }
     }
 
     /* 目标相对于车头的方位角 [0, 360) */
@@ -235,7 +250,9 @@ void chassis_send_cmd(chassis_move_t *chassis)
         Motor_SetPWM((int16_t)chassis->motor[i].speed_pid.Out, i);
     }
 
-    USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg);
+    USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
+                      chassis->date_to_usb.current_lat,
+                      chassis->date_to_usb.current_lon);
 }
 
 

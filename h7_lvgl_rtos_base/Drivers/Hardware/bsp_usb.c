@@ -3,7 +3,7 @@
 #include <string.h>
 
 #define CMD_VEL_FRAME_SIZE   12U
-#define TELEM_FRAME_SIZE      7U
+#define TELEM_FRAME_SIZE     15U
 
 static uint8_t   rx_buf[CMD_VEL_FRAME_SIZE];
 static uint8_t   rx_idx = 0;
@@ -63,16 +63,20 @@ cmd_vel_t USB_GetCmdVel(void)
     return cmd_vel;
 }
 
-void USB_SendTelemetry(float heading_to_target_deg)
+void USB_SendTelemetry(float heading_to_target_deg,
+                       float current_lat,
+                       float current_lon)
 {
     uint8_t buf[TELEM_FRAME_SIZE];
     buf[0] = 0xAA;
     buf[1] = 0x55;
-    memcpy(&buf[2], &heading_to_target_deg, 4);
+    memcpy(&buf[2],  &heading_to_target_deg, 4);
+    memcpy(&buf[6],  &current_lat,           4);
+    memcpy(&buf[10], &current_lon,           4);
 
     uint8_t checksum = 0;
-    for (uint8_t i = 2; i < 6; i++) checksum ^= buf[i];
-    buf[6] = checksum;
+    for (uint8_t i = 2; i < 14; i++) checksum ^= buf[i];
+    buf[14] = checksum;
 
     CDC_Transmit_FS(buf, TELEM_FRAME_SIZE);
 }
