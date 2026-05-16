@@ -200,7 +200,7 @@ void chassis_mode_change(chassis_move_t *chassis)
 }
 
 /* ============================================================
- *  步骤3: 底盘控制量设置 (优先级: 蓝牙 > 微信 > GPS)
+ *  步骤3: 底盘控制量设置 (优先级: 蓝牙 > 微信 > ROS室内 > GPS)
  * ============================================================ */
 void chassis_set_control(chassis_move_t *chassis)
 {
@@ -220,13 +220,19 @@ void chassis_set_control(chassis_move_t *chassis)
         chassis->mode = CAR_MODE_REMOTE;
         Remote_WeChat_Update(chassis);
     }
-    /* 3. GPS + ROS 融合导航 (Jetson mode=1) */
+    /* 3. 室内 ROS 自主导航 (Jetson mode=3, 纯cmd_vel) */
+    else if (jetson_online && jetson_mode == JETSON_MODE_LINE)
+    {
+        chassis->mode = CAR_MODE_LINE;
+        Remote_ROS_Update(chassis);
+    }
+    /* 4. GPS + ROS 融合导航 (Jetson mode=1) */
     else if (jetson_online && jetson_mode == JETSON_MODE_GPS)
     {
         chassis->mode = CAR_MODE_GPS;
         Navigation_Update_Loop_Fusion(chassis);
     }
-    /* 4. 默认: 纯 GPS 导航 */
+    /* 5. 默认: 纯 GPS 导航 */
     else
     {
         chassis->mode = CAR_MODE_GPS;
@@ -263,6 +269,8 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
+//	  QMC5883_Init();
+//	  GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
     chassis_start_gps_navigation(&chassis_move);

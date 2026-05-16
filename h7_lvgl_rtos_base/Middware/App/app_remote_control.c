@@ -69,3 +69,28 @@ void Remote_WeChat_Update(chassis_move_t *chassis)
     chassis->Vy_set = 0.0f;
     chassis->Wz_set = out_wz;
 }
+
+/* ============================================================
+ *  室内 ROS 自主导航 (Jetson mode=3)
+ *  纯 ROS cmd_vel 控制, 无 GPS 参与
+ *  vx → 前向速度, vz → 旋转速度
+ * ============================================================ */
+#define ROS_LINE_VX_SCALE  100.0f
+#define ROS_LINE_VZ_SCALE   30.0f
+#define ROS_LINE_MAX_SPEED  50.0f
+#define ROS_LINE_MAX_WZ     25.0f
+
+void Remote_ROS_Update(chassis_move_t *chassis)
+{
+    float out_vx = chassis->cmd_vel.vx * ROS_LINE_VX_SCALE;
+    float out_wz = chassis->cmd_vel.vz * ROS_LINE_VZ_SCALE;
+
+    if (out_vx >  ROS_LINE_MAX_SPEED) out_vx =  ROS_LINE_MAX_SPEED;
+    if (out_vx < -ROS_LINE_MAX_SPEED) out_vx = -ROS_LINE_MAX_SPEED;
+    if (out_wz >  ROS_LINE_MAX_WZ)    out_wz =  ROS_LINE_MAX_WZ;
+    if (out_wz < -ROS_LINE_MAX_WZ)    out_wz = -ROS_LINE_MAX_WZ;
+
+    chassis->Vx_set = out_vx;
+    chassis->Vy_set = 0.0f;
+    chassis->Wz_set = out_wz;
+}

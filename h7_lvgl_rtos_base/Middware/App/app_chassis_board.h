@@ -69,6 +69,7 @@ typedef struct {
 typedef enum {
     CAR_MODE_GPS = 0,          /* GPS 导航 (默认纯GPS, Jetson在线时融合ROS) */
     CAR_MODE_REMOTE,           /* 微信小程序遥控 (Jetson转发) */
+    CAR_MODE_LINE,             /* 室内 ROS 自主导航 (Jetson mode=3) */
     CAR_MODE_INDOOR            /* 蓝牙遥控 */
 } CarMode_t;
 

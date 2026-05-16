@@ -5,5 +5,6 @@
 
 void Remote_Control_Update(chassis_move_t *chassis);
 void Remote_WeChat_Update(chassis_move_t *chassis);
+void Remote_ROS_Update(chassis_move_t *chassis);
 
 #endif
