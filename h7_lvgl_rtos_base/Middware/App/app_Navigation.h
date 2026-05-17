@@ -8,7 +8,7 @@
 #define MAX_WAYPOINTS      10
 
 // 每个中间航点的停留等待时间（毫秒）。最后一个航点到达后直接停车，不会再等
-#define WAYPOINT_DWELL_MS  8000
+#define WAYPOINT_DWELL_MS  5000
 // ================================================================
 
 // 坐标结构体
@@ -44,6 +44,11 @@ typedef struct {
     uint8_t total_waypoints;          // 本次任务总航点数
     uint8_t current_wp_index;         // 当前正在前往第几个航点 (从0开始)
     uint32_t dwell_start_tick;        // 到达航点时的系统时间戳 (用于计时停留)
+	
+		double gps_utc_time;
+	
+	
+	
 } Navigation_State_t;
 
 /* 前向声明: 完整类型定义在 app_chassis_board.h */

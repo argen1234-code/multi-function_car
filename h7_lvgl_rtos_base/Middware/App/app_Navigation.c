@@ -7,11 +7,11 @@
 
 /* ---- 距离PID参数 ---- */
 static float Kp_dist  = 5.0f;     /* 米距 → 速度 单位转化比例 */
-static float Max_speed = 50.0f;   /* 最大平移速度限制 */
+static float Max_speed = 30.0f;   /* 最大平移速度限制 */
 
 /* ---- 航向偏角PID参数 ---- */
 static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */
-static float Max_wz  = 25.0f;     /* 最大旋转角速度限制 */
+static float Max_wz  = 18.0f;     /* 最大旋转角速度限制 */
 
 /* ============================================================
  *  内部: 加载航点路线
@@ -285,6 +285,9 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
     PT_GNGGA pGGA = GetGNGGA();
     PT_GPHPR pHPR = GetGPHPR();
 
+		nav->gps_utc_time = pGGA->utc_time;//为了后续检查GPS模式下数据丢失是什么原因搞得
+		
+		
     if (pGGA->qf < 1 || pGGA->lat < 1.0f) {
         chassis->Vx_set = 0.0f;
         chassis->Vy_set = 0.0f;

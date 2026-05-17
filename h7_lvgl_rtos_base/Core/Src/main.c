@@ -108,7 +108,7 @@ PD6			------>USART2_RX
 
 */
 int main(void)
-{ 
+{ 	
 	MPU_Config();				// MPU配置
 	SCB_EnableICache();		// 使能ICache
 	SCB_EnableDCache();		// 使能DCache

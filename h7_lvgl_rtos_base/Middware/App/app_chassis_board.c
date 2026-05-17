@@ -19,8 +19,11 @@
 
 /* ---- 预设 GPS 巡航路线 ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
-    {26.449591, 106.650651},
-    {26.449820, 106.650896}
+    {26.44970054683, 106.6505648425},
+ {26.4496634045, 106.650618892}
+		
+		
+		
 };
 
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
@@ -239,9 +242,7 @@ void chassis_set_control(chassis_move_t *chassis)
         Navigation_Update_Loop(chassis);
     }
 
-    //由于雷达和之前车头反方向，故增添取反
-    chassis->Vx_set = -chassis->Vx_set;
-    chassis->Vy_set = -chassis->Vy_set;
+   
 }
 
 /* ============================================================
@@ -269,8 +270,8 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
-//	  QMC5883_Init();
-//	  GPS_Init();
+	  QMC5883_Init();
+	  GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
     chassis_start_gps_navigation(&chassis_move);
