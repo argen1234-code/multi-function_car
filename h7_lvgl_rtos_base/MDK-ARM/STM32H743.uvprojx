@@ -3104,6 +3104,11 @@
               <FilePath>..\Drivers\Hardware\bsp_timer.h</FilePath>
             </File>
             <File>
+              <FileName>bsp_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_uart.c</FilePath>
+            </File>
+            <File>
               <FileName>bsp_uart.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Drivers\Hardware\bsp_uart.h</FilePath>
@@ -3129,11 +3134,6 @@
               <FilePath>..\Drivers\Hardware\bsp_GPS.h</FilePath>
             </File>
             <File>
-              <FileName>bsp_uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Drivers\Hardware\bsp_uart.c</FilePath>
-            </File>
-            <File>
               <FileName>bsp_bluetooth.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\Hardware\bsp_bluetooth.c</FilePath>
@@ -3152,6 +3152,31 @@
               <FileName>bsp_usb.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Drivers\Hardware\bsp_usb.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_JY901S.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_JY901S.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_JY901S.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_JY901S.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_REG.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_REG.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_wit_c_sdk.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_wit_c_sdk.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_wit_c_sdk.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_wit_c_sdk.h</FilePath>
             </File>
           </Files>
         </Group>

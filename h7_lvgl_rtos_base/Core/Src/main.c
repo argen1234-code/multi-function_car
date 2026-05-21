@@ -105,6 +105,9 @@ PA2			------>USART2_TX
 PD6			------>USART2_RX
 
 
+//JY901S
+PG9     ------> USART6_RX
+PG14     ------> USART6_TX
 
 */
 int main(void)
@@ -121,6 +124,7 @@ int main(void)
   MX_TIM4_Init();    //编码器
 	MX_USART1_UART_Init();//蓝牙模块使用串口1
 	MX_USART2_UART_Init();//GPS模块使用串口2
+	MX_USART6_UART_Init();//串口读取jy901s数据
 	MX_UART4_Init();   //串口读取jy61p数据
   MX_TIM3_Init();   //编码器
   MX_TIM5_Init();  //编码器

@@ -51,3 +51,4 @@ stm32h743\app_navigation.o: ..\Middware\App\app_Chassis_board.h
 stm32h743\app_navigation.o: ..\Drivers\Algorithm\pid.h
 stm32h743\app_navigation.o: ..\Drivers\Hardware\bsp_QMC5883.h
 stm32h743\app_navigation.o: ..\Drivers\Hardware\bsp_usb.h
+stm32h743\app_navigation.o: ..\Drivers\Hardware\bsp_JY901S.h

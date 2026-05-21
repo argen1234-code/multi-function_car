@@ -50,6 +50,7 @@ stm32h743\app_chassis_board.o: ..\Drivers\Algorithm\pid.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_QMC5883.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_usb.h
 stm32h743\app_chassis_board.o: ..\Middware\App\app_Navigation.h
+stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_JY901S.h
 stm32h743\app_chassis_board.o: ..\Middware\App\app_remote_control.h
 stm32h743\app_chassis_board.o: ..\USB_DEVICE\App\usbd_cdc_if.h
 stm32h743\app_chassis_board.o: ..\Middware\ST\STM32_USB_Device_Library\Class\CDC\Inc\usbd_cdc.h

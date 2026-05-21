@@ -6,6 +6,7 @@
 #include "bsp_QMC5883.h"
 #include "bsp_usb.h"
 #include "app_Navigation.h"
+#include "bsp_JY901S.h"
 
 #define chassis_board_task 1
 
@@ -48,6 +49,7 @@ typedef struct {
 typedef struct {
     EulerAngles mag;           /* QMC5883 磁力计欧拉角 */
     INS_Data_t  ins;           /* IMU/INS 姿态数据 */
+    JY901S_Data_t jy901s;      /* JY901S 九轴数据 */
 } IMU_Data_t;
 
 /* ============================================================

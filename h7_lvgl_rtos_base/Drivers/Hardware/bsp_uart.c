@@ -1,21 +1,33 @@
 #include "bsp_uart.h"
 #include "bsp_GPS.h"
 #include "bsp_bluetooth.h"
+#include "bsp_JY901S.h"
 #include <stdio.h>
 #include <stdarg.h>
 
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart6;
 
 uint16_t uart1_delay_count = 0;
 uint16_t uart2_delay_count = 0;
+uint16_t uart6_delay_count = 0;
 
 uint8_t uart1_rx_mode_temp;
 uint8_t uart2_rx_mode_temp;
+uint8_t uart6_rx_mode_temp;
 uint8_t uart1_rx_data[UART_RX_BUFFER_SIZE];
 uint8_t uart2_rx_data[UART_RX_BUFFER_SIZE];
+uint8_t uart6_rx_data[UART_RX_BUFFER_SIZE];
 static uint8_t uart1_print_buf[UART_TX_BUFFER_SIZE];
 static uint8_t uart2_print_buf[UART_TX_BUFFER_SIZE];
+static uint8_t uart6_print_buf[UART_TX_BUFFER_SIZE];
+
+__weak void JY901S_RxPro_HAL(uint8_t* pBuf, uint16_t Size)
+{
+	(void)pBuf;
+	(void)Size;
+}
 
 void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 {
@@ -69,6 +81,31 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 			HAL_UART_Receive(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE, BLOCK_WAITING_TIME);
 		}
 	}
+	else if (huart == &huart6)
+	{
+		uart6_rx_mode_temp = uart_rx_mode;
+
+		if (uart_rx_mode == UART_DMA_RX)
+		{
+			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart_rx_mode == UART_DMA_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart_rx_mode == UART_IT_RX)
+		{
+			HAL_UART_Receive_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart_rx_mode == UART_IT_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart_rx_mode == UART_Block_RX)
+		{
+			HAL_UART_Receive(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE, BLOCK_WAITING_TIME);
+		}
+	}
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -101,11 +138,27 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		}
 		else if (uart2_rx_mode_temp == UART_DMA_RX)
 		{
+			//Çå¿ÕDcache»º´æ
 			SCB_InvalidateDCache_by_Addr((uint32_t *)uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
 
 		GPS_RxPro_HAL(uart2_rx_data, UART_RX_BUFFER_SIZE);
+	}
+	else if (huart == &huart6)
+	{
+		if (uart6_rx_mode_temp == UART_IT_RX)
+		{
+			HAL_UART_Receive_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart6_rx_mode_temp == UART_DMA_RX)
+		{
+			//Çå¿ÕDcache»º´æ
+			SCB_InvalidateDCache_by_Addr((uint32_t *)uart6_rx_data, UART_RX_BUFFER_SIZE);
+			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+
+		JY901S_RxPro_HAL(uart6_rx_data, UART_RX_BUFFER_SIZE);
 	}
 }
 
@@ -140,6 +193,20 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
 	}
+	else if (huart == &huart6)
+	{
+		SCB_InvalidateDCache_by_Addr((uint32_t *)uart6_rx_data, UART_RX_BUFFER_SIZE);
+		JY901S_RxPro_HAL(uart6_rx_data, Size);
+
+		if (uart6_rx_mode_temp == UART_IT_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart6_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+	}
 }
 
 int my_uart_printf(UART_HandleTypeDef *huart, uint8_t send_mode, const char *format, ...)
@@ -155,6 +222,10 @@ int my_uart_printf(UART_HandleTypeDef *huart, uint8_t send_mode, const char *for
 	if (huart == &huart2)
 	{
 		print_buf = uart2_print_buf;
+	}
+	if (huart == &huart6)
+	{
+		print_buf = uart6_print_buf;
 	}
 
 	if (print_buf == NULL || format == NULL)

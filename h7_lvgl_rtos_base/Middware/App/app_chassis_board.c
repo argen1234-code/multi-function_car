@@ -8,6 +8,7 @@
 #include "bsp_motor.h"
 #include "bsp_GPS.h"
 #include "bsp_bluetooth.h"
+#include "bsp_JY901S.h"
 #include "usart.h"
 #include <math.h>
 
@@ -81,6 +82,17 @@ void chassis_feedback_update(chassis_move_t *chassis)
     /* 磁力计 → chassis->imu.mag */
     QMC5883_GetAngles(&chassis->imu.mag);
 
+    {
+        JY901S_Data_t jy901s_data;
+        if (JY901S_GetData(&jy901s_data))
+        {
+            chassis->imu.jy901s = jy901s_data;
+            chassis->imu.ins.euler.roll = jy901s_data.angle[0];
+            chassis->imu.ins.euler.pitch = jy901s_data.angle[1];
+            chassis->imu.ins.euler.yaw = jy901s_data.angle[2];
+        }
+    }
+
     /* 编码器 → chassis->motor[i].speed */
     for (uint8_t i = 0; i < 4; i++)
     {
@@ -143,6 +155,7 @@ static void chassis_init(chassis_move_t *chassis)
     USB_Init();
     uart_init(&huart1, UART_DMA_ToIdle_RX);
     uart_init(&huart2, UART_DMA_ToIdle_RX);
+    JY901S_Init();
 
     for (uint8_t i = 0; i < 4; i++)
     {
@@ -270,7 +283,7 @@ void chassis_task(void *pvParameters)
 {
     /* -- 一次性初始化 -- */
     chassis_init(&chassis_move);
-	  QMC5883_Init();
+	  //QMC5883_Init();
 	  GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
