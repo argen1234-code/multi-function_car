@@ -22,6 +22,12 @@ uint8_t uart6_rx_data[UART_RX_BUFFER_SIZE];
 static uint8_t uart1_print_buf[UART_TX_BUFFER_SIZE];
 static uint8_t uart2_print_buf[UART_TX_BUFFER_SIZE];
 static uint8_t uart6_print_buf[UART_TX_BUFFER_SIZE];
+static void uart6_clear_rx_error(void)
+{
+	__HAL_UART_CLEAR_FLAG(&huart6, UART_CLEAR_OREF | UART_CLEAR_NEF | UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_IDLEF);
+	__HAL_UART_SEND_REQ(&huart6, UART_RXDATA_FLUSH_REQUEST);
+	huart6.ErrorCode = HAL_UART_ERROR_NONE;
+}
 
 __weak void JY901S_RxPro_HAL(uint8_t* pBuf, uint16_t Size)
 {
@@ -84,6 +90,7 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 	else if (huart == &huart6)
 	{
 		uart6_rx_mode_temp = uart_rx_mode;
+		uart6_clear_rx_error();
 
 		if (uart_rx_mode == UART_DMA_RX)
 		{
@@ -108,6 +115,30 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 	}
 }
 
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	if (huart == &huart6)
+	{
+		uart6_clear_rx_error();
+
+		if (uart6_rx_mode_temp == UART_IT_RX)
+		{
+			HAL_UART_Receive_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart6_rx_mode_temp == UART_DMA_RX)
+		{
+			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart6_rx_mode_temp == UART_IT_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart6_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+	}
+}
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart1)
