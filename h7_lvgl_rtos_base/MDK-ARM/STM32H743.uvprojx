@@ -2988,6 +2988,16 @@
               <FileType>5</FileType>
               <FilePath>..\Middware\App\app_remote_control.h</FilePath>
             </File>
+            <File>
+              <FileName>app_Voice_Recognition.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Middware\App\app_Voice_Recognition.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_Voice_Recognition.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Middware\App\app_Voice_Recognition.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -3177,6 +3187,16 @@
               <FileName>bsp_wit_c_sdk.h</FileName>
               <FileType>5</FileType>
               <FilePath>..\Drivers\Hardware\bsp_wit_c_sdk.h</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_WonderEcho.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_WonderEcho.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_WonderEcho.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Drivers\Hardware\bsp_WonderEcho.h</FilePath>
             </File>
           </Files>
         </Group>

@@ -115,6 +115,7 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 	}
 }
 
+//增添usart6的错误处理函数，解决了偶发的ORE问题
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart6)

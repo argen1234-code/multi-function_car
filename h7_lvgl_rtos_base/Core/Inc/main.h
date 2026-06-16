@@ -30,6 +30,11 @@ extern "C" {
 #define USART2_TX_GPIO_Port GPIOD
 #define USART2_TXA2_Pin GPIO_PIN_2
 #define USART2_TXA2_GPIO_Port GPIOA
+#define SOFT_I2C_SDA_Pin GPIO_PIN_1
+#define SOFT_I2C_SDA_GPIO_Port GPIOB
+#define SOFT_I2C_SCL_Pin GPIO_PIN_0
+#define SOFT_I2C_SCL_GPIO_Port GPIOB
+
 /* Includes ------------------------------------------------------------------*/
 #include "stm32h7xx_hal.h"
 

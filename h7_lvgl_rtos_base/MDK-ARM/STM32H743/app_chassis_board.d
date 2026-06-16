@@ -52,6 +52,7 @@ stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_usb.h
 stm32h743\app_chassis_board.o: ..\Middware\App\app_Navigation.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_JY901S.h
 stm32h743\app_chassis_board.o: ..\Middware\App\app_remote_control.h
+stm32h743\app_chassis_board.o: ..\Middware\App\app_Voice_Recognition.h
 stm32h743\app_chassis_board.o: ..\USB_DEVICE\App\usbd_cdc_if.h
 stm32h743\app_chassis_board.o: ..\Middware\ST\STM32_USB_Device_Library\Class\CDC\Inc\usbd_cdc.h
 stm32h743\app_chassis_board.o: ..\Middware\ST\STM32_USB_Device_Library\Core\Inc\usbd_ioreq.h
@@ -79,4 +80,5 @@ stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_encoder.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_motor.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_GPS.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_bluetooth.h
+stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_WonderEcho.h
 stm32h743\app_chassis_board.o: ../Drivers/User/Inc/usart.h

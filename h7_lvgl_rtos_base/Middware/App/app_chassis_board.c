@@ -1,6 +1,7 @@
 #include "app_chassis_board.h"
 #include "app_Navigation.h"
 #include "app_remote_control.h"
+#include "app_Voice_Recognition.h"
 #include "usbd_cdc_if.h"
 #include "cmsis_os.h"
 #include "bsp_uart.h"
@@ -9,6 +10,7 @@
 #include "bsp_GPS.h"
 #include "bsp_bluetooth.h"
 #include "bsp_JY901S.h"
+#include "bsp_WonderEcho.h"
 #include "usart.h"
 #include <math.h>
 
@@ -20,9 +22,8 @@
 
 /* ---- 预设 GPS 巡航路线 ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
-    {26.44970054683, 106.6505648425},
- {26.4496634045, 106.650618892}
-		
+    {26.449634, 106.650672},
+ {26.449691, 106.650650}
 		
 		
 };
@@ -157,6 +158,11 @@ static void chassis_init(chassis_move_t *chassis)
     uart_init(&huart2, UART_DMA_ToIdle_RX);
     JY901S_Init();
 
+    /* WonderEcho 上电后需要短暂稳定时间，再初始化 PB0/PB1 软件 I2C。
+       初始化仍放在底盘任务内完成，不新增 FreeRTOS 任务，避免多处同时写底盘速度。 */
+    osDelay(200);
+    WonderEcho_I2C_Init();
+
     for (uint8_t i = 0; i < 4; i++)
     {
         PID_init(&chassis->motor[i].speed_pid, PID_POSITION,
@@ -213,6 +219,8 @@ void chassis_mode_change(chassis_move_t *chassis)
         default:
             break;
     }
+		
+		//chassis->mode = CAR_MODE_REMOTE;
 }
 
 /* ============================================================
@@ -248,7 +256,12 @@ void chassis_set_control(chassis_move_t *chassis)
         chassis->mode = CAR_MODE_GPS;
         Navigation_Update_Loop_Fusion(chassis);
     }
-    /* 5. 默认: 纯 GPS 导航 */
+    /* 5. WonderEcho 语音识别控制
+       语音目标速度由 App_Voice_Recognition_Update() 写入，此处保持现状。 */
+    else if (chassis->mode == CAR_MODE_VOICE)
+    {
+    }
+    /* 6. 默认: 纯 GPS 导航 */
     else
     {
         chassis->mode = CAR_MODE_GPS;
@@ -281,10 +294,12 @@ void chassis_send_cmd(chassis_move_t *chassis)
  * ============================================================ */
 void chassis_task(void *pvParameters)
 {
-    /* -- 一次性初始化 -- */
+    uint32_t voice_tick = 0U;
+
+    /* -- 一次性初始化 -- */ 
     chassis_init(&chassis_move);
-	  //QMC5883_Init();
-	  GPS_Init();
+	QMC5883_Init();
+	GPS_Init();
 
     /* -- 默认启动 GPS 循环巡航 -- */
     chassis_start_gps_navigation(&chassis_move);
@@ -294,7 +309,16 @@ void chassis_task(void *pvParameters)
     {
         chassis_mode_change(&chassis_move);       /* 蓝牙模式切换请求 */
         chassis_feedback_update(&chassis_move);   /* 传感器 + USB 数据刷新 */
-        chassis_set_control(&chassis_move);       /* 控制量设置 (优先级调度) */
+        if (HAL_GetTick() - voice_tick >= 50U)
+        {
+            voice_tick = HAL_GetTick();
+            App_Voice_Recognition_Update(&chassis_move);
+        }
+        
+//				chassis_move.Vx_set = 50.0f;
+//        chassis_move.Vy_set = 0.0f;
+//        chassis_move.Wz_set = 0.0f;
+		chassis_set_control(&chassis_move);       /* 控制量设置 (优先级调度) */
         chassis_control_loop(&chassis_move);      /* 运动学 + PID */
         chassis_send_cmd(&chassis_move);          /* 电机输出 + USB遥测 */
         osDelay(10);

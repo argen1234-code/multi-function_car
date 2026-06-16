@@ -11,9 +11,15 @@
 #define chassis_board_task 1
 
 /* ---- 底盘电机速度PID参数 ---- */
-#define MOTOR_SPEED_PID_KP       4.1f
-#define MOTOR_SPEED_PID_KI       0.2f
-#define MOTOR_SPEED_PID_KD       0.0f
+#define MOTOR_SPEED_PID_KP       1.05f
+#define MOTOR_SPEED_PID_KI       0.1f
+#define MOTOR_SPEED_PID_KD       0.1f
+//#define MOTOR_SPEED_PID_KP       0.0f
+//#define MOTOR_SPEED_PID_KI       0.0f
+//#define MOTOR_SPEED_PID_KD       0.0f
+
+
+
 //#define MOTOR_SPEED_PID_KP       1.60f
 //#define MOTOR_SPEED_PID_KI       0.15f
 //#define MOTOR_SPEED_PID_KD       0.10f
@@ -72,7 +78,8 @@ typedef enum {
     CAR_MODE_GPS = 0,          /* GPS 导航 (默认纯GPS, Jetson在线时融合ROS) */
     CAR_MODE_REMOTE,           /* 微信小程序遥控 (Jetson转发) */
     CAR_MODE_LINE,             /* 室内 ROS 自主导航 (Jetson mode=3) */
-    CAR_MODE_INDOOR            /* 蓝牙遥控 */
+    CAR_MODE_INDOOR,           /* 蓝牙遥控 */
+    CAR_MODE_VOICE             /* WonderEcho 语音识别控制 */
 } CarMode_t;
 
 /* ============================================================

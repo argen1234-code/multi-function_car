@@ -6,8 +6,9 @@
 #define PI 3.14159265358979323846f
 
 /* ---- 距离PID参数 ---- */
-static float Kp_dist  = 5.0f;     /* 米距 → 速度 单位转化比例 */
-static float Max_speed = 30.0f;   /* 最大平移速度限制 */
+static float Kp_dist  = 8.0f;     /* 米距 → 速度 单位转化比例 */
+static float Max_speed = 50.0f;   /* 最大平移速度限制 */
+static float Min_speed = 40.0f;   /* 克服底盘低速死区的最小平移速度 */
 
 /* ---- 航向偏角PID参数 ---- */
 static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */
@@ -227,6 +228,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     /* a. 距离 → 平移速度 (P控) */
     float target_v = nav->distance_error * Kp_dist;
     if (target_v > Max_speed) target_v = Max_speed;
+    if (target_v < Min_speed) target_v = Min_speed;
 
     float rad_err = angle_diff * PI / 180.0f;
     float out_vx = target_v * cosf(rad_err);
