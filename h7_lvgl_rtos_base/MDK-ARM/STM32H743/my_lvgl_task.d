@@ -140,5 +140,12 @@ stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\ui.h
 stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\ui_helpers.h
 stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\ui.h
 stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\ui_events.h
-stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_Screen1.h
-stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_Screen2.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_Screenmain.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_Screensettings.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_FileManager.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_DataDisplay.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_DataDetail.h
+stm32h743\my_lvgl_task.o: ..\Middware\LVGL\demos\01_interactive_page\screens/ui_Login.h
+stm32h743\my_lvgl_task.o: ..\Drivers\Hardware\bsp_TF_card.h
+stm32h743\my_lvgl_task.o: ..\Drivers\Hardware\bsp_tf_image_load.h
+stm32h743\my_lvgl_task.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

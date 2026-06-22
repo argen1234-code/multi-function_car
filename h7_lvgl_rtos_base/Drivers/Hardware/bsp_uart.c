@@ -6,6 +6,19 @@
 #include <stdarg.h>
 
 extern UART_HandleTypeDef huart1;
+
+/* printf retargeting for MicroLib: redirect stdout to USART1 */
+int fputc(int ch, FILE *f)
+{
+	HAL_UART_Transmit(&huart1, (uint8_t *)&ch, 1, HAL_MAX_DELAY);
+	return ch;
+}
+
+/* MicroLib lacks __aeabi_assert â€” provide stub for LVGL qrcodegen */
+void __aeabi_assert(const char *expr, const char *file, int line)
+{
+	while (1);
+}
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart6;
 
@@ -115,7 +128,7 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 	}
 }
 
-//ÔöÌíusart6µÄ´íÎó´¦Àíº¯Êý£¬½â¾öÁËÅ¼·¢µÄOREÎÊÌâ
+//ï¿½ï¿½ï¿½ï¿½usart6ï¿½Ä´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Å¼ï¿½ï¿½ï¿½ï¿½OREï¿½ï¿½ï¿½ï¿½
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart6)
@@ -170,7 +183,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		}
 		else if (uart2_rx_mode_temp == UART_DMA_RX)
 		{
-			//Çå¿ÕDcache»º´æ
+			//ï¿½ï¿½ï¿½Dcacheï¿½ï¿½ï¿½ï¿½
 			SCB_InvalidateDCache_by_Addr((uint32_t *)uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
@@ -185,7 +198,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		}
 		else if (uart6_rx_mode_temp == UART_DMA_RX)
 		{
-			//Çå¿ÕDcache»º´æ
+			//ï¿½ï¿½ï¿½Dcacheï¿½ï¿½ï¿½ï¿½
 			SCB_InvalidateDCache_by_Addr((uint32_t *)uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}

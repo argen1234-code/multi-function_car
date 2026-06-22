@@ -130,3 +130,6 @@ stm32h743\lv_fs_fatfs.o: ..\Middware\LVGL\src\extra\libs\fsdrv\../../../../src/e
 stm32h743\lv_fs_fatfs.o: ..\Middware\LVGL\src\extra\libs\fsdrv\../../../../src/extra/libs/freetype/lv_freetype.h
 stm32h743\lv_fs_fatfs.o: ..\Middware\LVGL\src\extra\libs\fsdrv\../../../../src/extra/libs/rlottie/lv_rlottie.h
 stm32h743\lv_fs_fatfs.o: ..\Middware\LVGL\src\extra\libs\fsdrv\../../../../src/extra/libs/ffmpeg/lv_ffmpeg.h
+stm32h743\lv_fs_fatfs.o: ..\Middware\Third_Party\FATFS\ff.h
+stm32h743\lv_fs_fatfs.o: ..\Middware\Third_Party\FATFS\integer.h
+stm32h743\lv_fs_fatfs.o: ..\Middware\Third_Party\FATFS\ffconf.h

@@ -11,6 +11,7 @@ extern "C" {
 #endif
 
 #include "lvgl.h"
+#include "my_lvgl_task.h"
 
 #include "ui_helpers.h"
 #include "ui_events.h"
@@ -18,8 +19,12 @@ extern "C" {
 
 ///////////////////// SCREENS ////////////////////
 
-#include "screens/ui_Screen1.h"
-#include "screens/ui_Screen2.h"
+#include "screens/ui_Screenmain.h"
+#include "screens/ui_Screensettings.h"
+#include "screens/ui_FileManager.h"
+#include "screens/ui_DataDisplay.h"
+#include "screens/ui_DataDetail.h"
+#include "screens/ui_Login.h"
 
 ///////////////////// VARIABLES ////////////////////
 
@@ -28,8 +33,20 @@ extern "C" {
 
 extern lv_obj_t * ui____initial_actions0;
 
+// IMAGES AND IMAGE SETS
+extern lv_img_dsc_t ui_img_1301672413;
+extern lv_img_dsc_t ui_img_380527393;    // assets/屏幕截图 2026-06-22 110729.png
+extern lv_img_dsc_t ui_img_1565185032;    // assets/屏幕截图 2026-06-22 111053.png
+extern lv_img_dsc_t ui_img_1614311220;    // assets/屏幕截图 2026-06-22 111000.png
+extern lv_img_dsc_t ui_img_1943878613;    // assets/屏幕截图 2026-02-06 135759 (1).png
+
 // FONTS
 LV_FONT_DECLARE(ui_font_Font1);
+LV_FONT_DECLARE(ui_font_FontTitle);
+LV_FONT_DECLARE(ui_font_Font2);
+LV_FONT_DECLARE(ui_font_Font3);
+LV_FONT_DECLARE(ui_font_Font4);
+LV_FONT_DECLARE(ui_font_Font5);
 
 // UI INIT
 void ui_init(void);

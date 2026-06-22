@@ -320,10 +320,19 @@ void UART4_IRQHandler(void)
   /* USER CODE BEGIN UART7_IRQn 0 */
 
   /* USER CODE END UART7_IRQn 0 */
-  HAL_UART_IRQHandler(&huart4);
+  //HAL_UART_IRQHandler(&huart4); // UART4 disabled
   /* USER CODE BEGIN UART7_IRQn 1 */
 
   /* USER CODE END UART7_IRQn 1 */
+}
+
+/**
+  * @brief This function handles SDMMC1 global interrupt.
+  */
+extern SD_HandleTypeDef hsd_sdmmc[];
+void SDMMC1_IRQHandler(void)
+{
+  HAL_SD_IRQHandler(&hsd_sdmmc[0]);
 }
 
 /**

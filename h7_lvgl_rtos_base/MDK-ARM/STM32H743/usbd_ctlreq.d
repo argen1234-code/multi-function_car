@@ -41,6 +41,11 @@ stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ltdc.
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_ltdc_ex.h
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr.h
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pwr_ex.h
+stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_qspi.h
+stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_sd.h
+stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_sdmmc.h
+stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_delayblock.h
+stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_sd_ex.h
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_sdram.h
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_fmc.h
 stm32h743\usbd_ctlreq.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_tim.h

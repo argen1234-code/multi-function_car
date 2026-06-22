@@ -34,7 +34,7 @@ void MX_FREERTOS_Init(void);
 ****************************************************************************************************/
 
 /*已使用引脚
-PC13(LED),PA15(KEY),PB10,PB11(OLED),PB12 13 ,14 15,  PC11,12(MOTOR_DIR)
+PC13(LED),PA15(KEY),PB10,PB11(OLED),PB12 13 ,14 15,  PC4,5(MOTOR_DIR_FR)
 
 PB3     ------> TIM2_CH2
 PA5     ------> TIM2_CH1
@@ -84,29 +84,42 @@ PI14     ------> LTDC_CLK
 														
 PG3(TOUCH SCL),PG7(TOUCH SDA),PI10, PI11,没在cubemx初始化 注意
 
-PC10     ------> UART4_TX
-PH14     ------> UART4_RX
+//---SDMMC1 TF Card (4-bit, 20MHz, images loaded at boot)---
+PC8      ------> SDMMC1_D0
+PC9      ------> SDMMC1_D1
+PC10     ------> SDMMC1_D2 (ex UART4_TX)
+PC11     ------> SDMMC1_D3 (ex Motor DIR1, moved to PC4)
+PC12     ------> SDMMC1_CK (ex Motor DIR2, moved to PC5)
+PD2      ------> SDMMC1_CMD
+//---QSPI W25Q64 Flash (quad I/O, 120MHz)---
+//PF10    ------> QSPI_CLK
+//PG6     ------> QSPI_NCS
+//PF8     ------> QSPI_IO0
+//PF9     ------> QSPI_IO1
+//PF7     ------> QSPI_IO2
+//PF6     ------> QSPI_IO3
+
+// PH14 freed (ex UART4_RX)
+// Images: FAT32 TF card → f_read → SDRAM → LVGL at boot
 
 PA11     ------> USB_DM
 PA12     ------> USB_DP
 
+//---磁力计 QMC5883---
+PB8     ------> I2C1_SCL
+PB9     ------> I2C1_SDA
 
-//---磁力计----
-PB8			------>I2C1_SCL 
-PB9			------>I2C1_SDA
-
-//蓝牙
-PA9     ------> usart1_tx
-PA10     ------> usart1_rx
+//---蓝牙---
+PA9     ------> USART1_TX
+PA10    ------> USART1_RX
 
 //---GPS---
-PA2			------>USART2_TX
-PD6			------>USART2_RX
+PA2     ------> USART2_TX
+PD6     ------> USART2_RX
 
-
-//JY901S
+//---JY901S IMU---
 PG9     ------> USART6_RX
-PG14     ------> USART6_TX
+PG14    ------> USART6_TX
 
 */
 int main(void)
@@ -117,18 +130,18 @@ int main(void)
 	HAL_Init();					// 初始化HAL库
 	SystemClock_Config();	// 配置系统时钟，主频480MHz
 	
-	MX_GPIO_Init();        //引脚初始化
-	MX_DMA_Init();
-  MX_TIM2_Init();    //编码器
-  MX_TIM4_Init();    //编码器
-	MX_USART1_UART_Init();//蓝牙模块使用串口1
-	MX_USART2_UART_Init();//GPS模块使用串口2
-	MX_USART6_UART_Init();//串口读取jy901s数据
-	MX_UART4_Init();   //串口读取jy61p数据
-  MX_TIM3_Init();   //编码器
-  MX_TIM5_Init();  //编码器
-  MX_TIM8_Init();  //4路PWM波
-	MX_I2C1_Init();		//i2c初始化
+		MX_GPIO_Init();           // GPIO pin init (LED, KEY, motor DIR)
+	  MX_DMA_Init();
+		MX_TIM2_Init();           // Encoder FL
+		MX_TIM4_Init();           // Encoder RL
+		MX_USART1_UART_Init();    // Bluetooth
+		MX_USART2_UART_Init();    // GPS
+		MX_USART6_UART_Init();    // JY901S IMU
+	//MX_UART4_Init();   // UART4 disabled: PC10 freed for SDMMC1_D2
+		MX_TIM3_Init();           // Encoder FR
+		MX_TIM5_Init();           // Encoder RR
+		MX_TIM8_Init();           // 4-channel motor PWM
+		MX_I2C1_Init();           // QMC5883 magnetometer
 	
 	LED_Init();					// 初始化LED引脚
 	MX_FMC_Init();				// SDRAM初始化
@@ -266,9 +279,10 @@ void SystemClock_Config(void)
   PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOMEDIUM;
   PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
   
-  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_FMC;               
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LTDC|RCC_PERIPHCLK_USART1|RCC_PERIPHCLK_FMC|RCC_PERIPHCLK_SDMMC;               
   PeriphClkInitStruct.FmcClockSelection = RCC_FMCCLKSOURCE_D1HCLK;
   PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_D2PCLK2;
+	PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;    // PLL1_Q=480MHz
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();

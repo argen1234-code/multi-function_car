@@ -130,8 +130,13 @@ stm32h743\ui_font_font1.o: ..\Middware\LVGL\src/extra/libs/sjpg/lv_sjpg.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\src/extra/libs/freetype/lv_freetype.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\src/extra/libs/rlottie/lv_rlottie.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\src/extra/libs/ffmpeg/lv_ffmpeg.h
+stm32h743\ui_font_font1.o: ..\Middware\App\my_lvgl_task.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../ui_helpers.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../ui.h
 stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../ui_events.h
-stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_Screen1.h
-stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_Screen2.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_Screenmain.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_Screensettings.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_FileManager.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_DataDisplay.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_DataDetail.h
+stm32h743\ui_font_font1.o: ..\Middware\LVGL\demos\01_interactive_page\fonts\../screens/ui_Login.h

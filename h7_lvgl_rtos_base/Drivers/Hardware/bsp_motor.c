@@ -6,7 +6,7 @@
 
 void Motor_Init(void)
 {
-    // Æô¶¯ËùÓÐPWMÍ¨µÀ
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½PWMÍ¨ï¿½ï¿½
     HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);  //A
     HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_2);  //B
     HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_3);  //C
@@ -54,13 +54,13 @@ void Motor_SetDirection(int16_t PWM, uint8_t motor_position)
         case MOTOR_FRONT_RIGHT:
             if (PWM >= 0)
             {
-                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_SET);
-                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);   // PC4=DIR1 (ex-PC11, moved for SDMMC1)
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET); // PC5=DIR2 (ex-PC12, moved for SDMMC1)
             }
             else
             {
-                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_11, GPIO_PIN_RESET);
-                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
+                HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
             }
             break;
             
@@ -97,16 +97,16 @@ void Motor_SetDirection(int16_t PWM, uint8_t motor_position)
 
 void Motor_SetPWM(int16_t PWM, uint8_t motor_position)
 {
-    LimitMax(PWM, PWM_MAX);  // ¶ÔPWMÏÞ·ù
+    LimitMax(PWM, PWM_MAX);  // ï¿½ï¿½PWMï¿½Þ·ï¿½
     
-    // ÉèÖÃµç»ú·½Ïò
+    // ï¿½ï¿½ï¿½Ãµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     Motor_SetDirection(PWM, motor_position);
     
-    // ÉèÖÃPWMÖµ
+    // ï¿½ï¿½ï¿½ï¿½PWMÖµ
     PWM_SetCompare(abs(PWM), motor_position);
 }
 
-// Í³Ò»ÉèÖÃËùÓÐµç»úPWM
+// Í³Ò»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½ï¿½PWM
 void Motor_SetAllPWM(int16_t front_left, int16_t front_right, int16_t rear_left, int16_t rear_right)
 {
     Motor_SetPWM(front_left, MOTOR_FRONT_LEFT);

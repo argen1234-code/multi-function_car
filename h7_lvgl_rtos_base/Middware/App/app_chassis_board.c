@@ -30,6 +30,7 @@ static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
 
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
 static chassis_move_t    chassis_move    = {0};
+volatile int gui_req_mode = -1;
 
 /* Keil Watch 调试: 直接输入 chassis_debug 即可展开结构体 */
 chassis_move_t *const chassis_debug = &chassis_move;
@@ -205,6 +206,12 @@ void chassis_control_loop(chassis_move_t *chassis)
 void chassis_mode_change(chassis_move_t *chassis)
 {
     BT_ModeReq_t req = BT_GetAndClearModeReq();
+
+    if (gui_req_mode >= 0 && gui_req_mode <= 4) {
+        Chassis_SetMode(chassis, (CarMode_t)gui_req_mode);
+        gui_req_mode = -1;
+        return;
+    }
 
     switch (req)
     {

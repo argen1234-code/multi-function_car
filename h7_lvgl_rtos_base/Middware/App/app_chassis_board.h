@@ -141,6 +141,8 @@ typedef struct {
 extern void chassis_task(void *pvParameters);
 extern void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode);
 
+extern volatile int gui_req_mode;   /* GUI mode request (-1=none, 0..4=CarMode_t) */
+
 /* 主循环 5 步骤 (定义于此, 便于外部模块替换实现) */
 extern void chassis_mode_change(chassis_move_t *chassis);
 extern void chassis_feedback_update(chassis_move_t *chassis);

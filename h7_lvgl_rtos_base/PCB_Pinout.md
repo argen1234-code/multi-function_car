@@ -62,18 +62,35 @@
 | GND | TB6612-GND | JY901S GND |
 | VCC | TB6612-3.3V | JY901S VCC |
 
-### UART4 - Reserved
+### UART4 - Disabled (pins freed for SDMMC1)
 
-波特率：`115200`
+UART4 已禁用，`MX_UART4_Init()` 已注释。引脚 `PC10` 释放给 SDMMC1_D2。
 
-| MCU 信号 | MCU 引脚 | 接模块 |
+## SDMMC1 - TF Card
+
+SDIO 4-bit 模式，时钟 20MHz。
+
+| SDMMC1 信号 | MCU 引脚 | 说明 |
 | --- | --- | --- |
-| UART4_TX | PC10 | 模块 RX |
-| UART4_RX | PH14 | 模块 TX |
-| GND | GND | 模块 GND |
-| VCC | 3.3V | 模块 VCC |
+| SDMMC1_CK | PC12 | 时钟（原 Motor DIR2，引脚已换到 PC5） |
+| SDMMC1_CMD | PD2 | 命令 |
+| SDMMC1_D0 | PC8 | 数据 0 |
+| SDMMC1_D1 | PC9 | 数据 1 |
+| SDMMC1_D2 | PC10 | 数据 2（原 UART4_TX，已禁用） |
+| SDMMC1_D3 | PC11 | 数据 3（原 Motor DIR1，引脚已换到 PC4） |
 
-备注：当前工程初始化了 `UART4`，但底盘任务里没有调用 `uart_init(&huart4, ...)` 开启接收链路。后续真要使用 UART4，需要同步检查软件接收部分。
+驱动文件：`Drivers/User/Src/sdmmc_sd.c` / `.h`（来自 SDK 例程 `05.SDIO-基本数据读写`）。
+
+封装文件：`Drivers/Hardware/bsp_TF_card.c` / `.h`
+
+图片加载：`Drivers/Hardware/bsp_tf_image_load.c` / `.h`
+- TF 卡 FAT32 格式化，复制 `icon.bin` / `bg.bin` 文件
+- 启动时 f_read 读取到 SDRAM，patches lv_img_dsc_t 描述符
+- SquareLine 更新后用 Python 提取 .bin 文件替换 TF 卡上的即可
+- diskio 层用 `__disable_irq()` 保护多扇区传输不被 FreeRTOS 打断
+
+文件管理：`Drivers/Hardware/bsp_fatfs_ex.c` / `.h`
+- 文件类型识别、磁盘空间查询、文件/文件夹复制（带进度回调）
 
 ## USB CDC
 
@@ -124,7 +141,7 @@ OLED 地址：`0x78` 或 `0x7A`，以实际模块为准。
 | 车轮 | PWM | 方向 1 | 方向 2 |
 | --- | --- | --- | --- |
 | Front Left | PI5 / TIM8_CH1 / TB6612-PWMA | PA6 / TB6612-AIN1 | PA7 / TB6612-AIN2 |
-| Front Right | PI6 / TIM8_CH2 / TB6612-PWMB | PC11 / TB6612-BIN1 | PC12 / TB6612-BIN2 |
+| Front Right | PI6 / TIM8_CH2 / TB6612-PWMB | PC4 / TB6612-BIN1 | PC5 / TB6612-BIN2 |
 | Rear Left | PI7 / TIM8_CH3 / TB6612-PWMC | PB12 / TB6612-CIN1 | PB13 / TB6612-CIN2 |
 | Rear Right | PI2 / TIM8_CH4 / TB6612-PWMD | PB14 / TB6612-DIN1 | PB15 / TB6612-DIN2 |
 
@@ -133,7 +150,7 @@ OLED 地址：`0x78` 或 `0x7A`，以实际模块为准。
 | 车轮 | PWM >= 0 | PWM < 0 |
 | --- | --- | --- |
 | Front Left | PA6=1, PA7=0 | PA6=0, PA7=1 |
-| Front Right | PC11=1, PC12=0 | PC11=0, PC12=1 |
+| Front Right | PC4=1, PC5=0 | PC4=0, PC5=1 |
 | Rear Left | PB12=1, PB13=0 | PB12=0, PB13=1 |
 | Rear Right | PB14=1, PB15=0 | PB14=0, PB15=1 |
 
