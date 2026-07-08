@@ -7,8 +7,16 @@
 #include "bsp_usb.h"
 #include "app_Navigation.h"
 #include "bsp_JY901S.h"
+#include "app_remote_control.h"
 
 #define chassis_board_task 1
+
+/* ---- 各模式控制增益 (运行时可由 GUI / 调试器调整) ---- */
+#define CHASSIS_GAIN_GPS      1.0f
+#define CHASSIS_GAIN_INDOOR   1.0f
+#define CHASSIS_GAIN_REMOTE   1.0f
+#define CHASSIS_GAIN_LINE     1.0f
+#define CHASSIS_GAIN_VOICE    1.0f
 
 /* ---- 底盘电机速度PID参数 ---- */
 #define MOTOR_SPEED_PID_KP       1.05f
@@ -93,6 +101,17 @@ typedef struct {
 } date_to_usb_t;
 
 /* ============================================================
+ *  各模式控制增益结构体
+ * ============================================================ */
+typedef struct {
+    float gps;      /* GPS 导航增益 */
+    float indoor;   /* 蓝牙遥控增益 */
+    float remote;   /* 微信遥控增益 */
+    float line;     /* ROS 室内导航增益 */
+    float voice;    /* 语音控制增益 */
+} chassis_gain_t;
+
+/* ============================================================
  *  底盘全向移动总控制结构体
  *  (实例在 app_chassis_board.c, 外部通过指针传递)
  * ============================================================ */
@@ -113,6 +132,12 @@ typedef struct chassis_move_s {
 
     /* ---- USB 回传数据 ---- */
     date_to_usb_t       date_to_usb; /* STM32 → Jetson */
+
+    /* ---- 遥控控制量参数 ---- */
+    RemoteControl_t     remote;     /* 各遥控模式控制量 (运行时可调) */
+
+    /* ---- 控制增益 ---- */
+    chassis_gain_t      gain;       /* 各模式 Vx/Vy/Wz 增益 */
 
     /* ---- 全向移动目标速度 (运动学分解前的合速度) ---- */
     float Vx_set;                  /* X 轴目标速度  (纵向) */
@@ -142,6 +167,8 @@ extern void chassis_task(void *pvParameters);
 extern void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode);
 
 extern volatile int gui_req_mode;   /* GUI mode request (-1=none, 0..4=CarMode_t) */
+extern volatile CarMode_t chassis_current_mode_debug;
+extern volatile int chassis_last_bt_req_debug;
 
 /* 主循环 5 步骤 (定义于此, 便于外部模块替换实现) */
 extern void chassis_mode_change(chassis_move_t *chassis);

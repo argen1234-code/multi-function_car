@@ -29,12 +29,47 @@ uint16_t uart6_delay_count = 0;
 uint8_t uart1_rx_mode_temp;
 uint8_t uart2_rx_mode_temp;
 uint8_t uart6_rx_mode_temp;
-uint8_t uart1_rx_data[UART_RX_BUFFER_SIZE];
-uint8_t uart2_rx_data[UART_RX_BUFFER_SIZE];
-uint8_t uart6_rx_data[UART_RX_BUFFER_SIZE];
-static uint8_t uart1_print_buf[UART_TX_BUFFER_SIZE];
-static uint8_t uart2_print_buf[UART_TX_BUFFER_SIZE];
-static uint8_t uart6_print_buf[UART_TX_BUFFER_SIZE];
+__ALIGNED(32) uint8_t uart1_rx_data[UART_RX_BUFFER_SIZE];
+__ALIGNED(32) uint8_t uart2_rx_data[UART_RX_BUFFER_SIZE];
+__ALIGNED(32) uint8_t uart6_rx_data[UART_RX_BUFFER_SIZE];
+static __ALIGNED(32) uint8_t uart1_print_buf[UART_TX_BUFFER_SIZE];
+static __ALIGNED(32) uint8_t uart2_print_buf[UART_TX_BUFFER_SIZE];
+static __ALIGNED(32) uint8_t uart6_print_buf[UART_TX_BUFFER_SIZE];
+
+static void uart_dcache_invalidate(uint8_t *buf, uint32_t len)
+{
+	uint32_t addr;
+	uint32_t aligned_addr;
+	uint32_t aligned_len;
+
+	if (buf == NULL || len == 0U)
+	{
+		return;
+	}
+
+	addr = (uint32_t)buf;
+	aligned_addr = addr & ~31UL;
+	aligned_len = ((addr + len + 31UL) & ~31UL) - aligned_addr;
+	SCB_InvalidateDCache_by_Addr((uint32_t *)aligned_addr, (int32_t)aligned_len);
+}
+
+static void uart_dcache_clean(uint8_t *buf, uint32_t len)
+{
+	uint32_t addr;
+	uint32_t aligned_addr;
+	uint32_t aligned_len;
+
+	if (buf == NULL || len == 0U)
+	{
+		return;
+	}
+
+	addr = (uint32_t)buf;
+	aligned_addr = addr & ~31UL;
+	aligned_len = ((addr + len + 31UL) & ~31UL) - aligned_addr;
+	SCB_CleanDCache_by_Addr((uint32_t *)aligned_addr, (int32_t)aligned_len);
+}
+
 static void uart6_clear_rx_error(void)
 {
 	__HAL_UART_CLEAR_FLAG(&huart6, UART_CLEAR_OREF | UART_CLEAR_NEF | UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_IDLEF);
@@ -56,10 +91,12 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 
 		if (uart_rx_mode == UART_DMA_RX)
 		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_IT_RX)
@@ -81,10 +118,12 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 
 		if (uart_rx_mode == UART_DMA_RX)
 		{
+			uart_dcache_invalidate(uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_IT_RX)
@@ -107,10 +146,12 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 
 		if (uart_rx_mode == UART_DMA_RX)
 		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart_rx_mode == UART_IT_RX)
@@ -141,6 +182,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		}
 		else if (uart6_rx_mode_temp == UART_DMA_RX)
 		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart6_rx_mode_temp == UART_IT_ToIdle_RX)
@@ -149,6 +191,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		}
 		else if (uart6_rx_mode_temp == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
 	}
@@ -157,26 +200,32 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == &huart1)
 	{
+		if (uart1_rx_mode_temp == UART_DMA_RX)
+		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
+		}
+
+		BT_ProcessRxData(uart1_rx_data, UART_RX_BUFFER_SIZE);
+
 		if (uart1_rx_mode_temp == UART_IT_RX)
 		{
 			HAL_UART_Receive_IT(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
 		}
 		else if (uart1_rx_mode_temp == UART_DMA_RX)
 		{
-			SCB_InvalidateDCache_by_Addr((uint32_t *)uart1_rx_data, UART_RX_BUFFER_SIZE);
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
-		}
-
-		BT_ProcessRxData(uart1_rx_data, UART_RX_BUFFER_SIZE);
-
-		if (uart1_rx_data[0] == '1')
-		{
-			my_uart_printf(&huart1, UART_DMA_TX, "%d\r\n", 1);
-			uart1_rx_data[0] = 0;
 		}
 	}
 	else if (huart == &huart2)
 	{
+		if (uart2_rx_mode_temp == UART_DMA_RX)
+		{
+			uart_dcache_invalidate(uart2_rx_data, UART_RX_BUFFER_SIZE);
+		}
+
+		GPS_RxPro_HAL(uart2_rx_data, UART_RX_BUFFER_SIZE);
+
 		if (uart2_rx_mode_temp == UART_IT_RX)
 		{
 			HAL_UART_Receive_IT(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
@@ -184,14 +233,19 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		else if (uart2_rx_mode_temp == UART_DMA_RX)
 		{
 			//���Dcache����
-			SCB_InvalidateDCache_by_Addr((uint32_t *)uart2_rx_data, UART_RX_BUFFER_SIZE);
+			uart_dcache_invalidate(uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
-
-		GPS_RxPro_HAL(uart2_rx_data, UART_RX_BUFFER_SIZE);
 	}
 	else if (huart == &huart6)
 	{
+		if (uart6_rx_mode_temp == UART_DMA_RX)
+		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
+		}
+
+		JY901S_RxPro_HAL(uart6_rx_data, UART_RX_BUFFER_SIZE);
+
 		if (uart6_rx_mode_temp == UART_IT_RX)
 		{
 			HAL_UART_Receive_IT(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
@@ -199,11 +253,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		else if (uart6_rx_mode_temp == UART_DMA_RX)
 		{
 			//���Dcache����
-			SCB_InvalidateDCache_by_Addr((uint32_t *)uart6_rx_data, UART_RX_BUFFER_SIZE);
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UART_Receive_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
-
-		JY901S_RxPro_HAL(uart6_rx_data, UART_RX_BUFFER_SIZE);
 	}
 }
 
@@ -211,7 +263,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart == &huart1)
 	{
-		SCB_InvalidateDCache_by_Addr((uint32_t *)uart1_rx_data, UART_RX_BUFFER_SIZE);
+		if (uart1_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			uart_dcache_invalidate(uart1_rx_data, Size);
+		}
 
 		BT_ProcessRxData(uart1_rx_data, Size);
 
@@ -221,12 +276,16 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		}
 		else if (uart1_rx_mode_temp == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
 		}
 	}
 	else if (huart == &huart2)
 	{
-		SCB_InvalidateDCache_by_Addr((uint32_t *)uart2_rx_data, UART_RX_BUFFER_SIZE);
+		if (uart2_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			uart_dcache_invalidate(uart2_rx_data, Size);
+		}
 		GPS_RxPro_HAL(uart2_rx_data, Size);
 
 		if (uart2_rx_mode_temp == UART_IT_ToIdle_RX)
@@ -235,12 +294,16 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		}
 		else if (uart2_rx_mode_temp == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart2_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, uart2_rx_data, UART_RX_BUFFER_SIZE);
 		}
 	}
 	else if (huart == &huart6)
 	{
-		SCB_InvalidateDCache_by_Addr((uint32_t *)uart6_rx_data, UART_RX_BUFFER_SIZE);
+		if (uart6_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			uart_dcache_invalidate(uart6_rx_data, Size);
+		}
 		JY901S_RxPro_HAL(uart6_rx_data, Size);
 
 		if (uart6_rx_mode_temp == UART_IT_ToIdle_RX)
@@ -249,6 +312,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		}
 		else if (uart6_rx_mode_temp == UART_DMA_ToIdle_RX)
 		{
+			uart_dcache_invalidate(uart6_rx_data, UART_RX_BUFFER_SIZE);
 			HAL_UARTEx_ReceiveToIdle_DMA(&huart6, uart6_rx_data, UART_RX_BUFFER_SIZE);
 		}
 	}
@@ -289,6 +353,7 @@ int my_uart_printf(UART_HandleTypeDef *huart, uint8_t send_mode, const char *for
 
 	if (send_mode == UART_DMA_TX)
 	{
+		uart_dcache_clean(print_buf, (uint32_t)len);
 		HAL_UART_Transmit_DMA(huart, print_buf, len);
 	}
 	else if (send_mode == UART_IT_TX)

@@ -1,13 +1,6 @@
 #include "app_remote_control.h"
+#include "app_chassis_board.h"
 #include "bsp_bluetooth.h"
-
-#define BT_REMOTE_SPEED  20.0f
-
-/* 微信遥控 cmd_vel 缩放 (m/s / rad/s → 内部 RPM) */
-#define WECHAT_VX_SCALE  100.0f
-#define WECHAT_VZ_SCALE   30.0f
-#define WECHAT_MAX_SPEED  50.0f
-#define WECHAT_MAX_WZ     25.0f
 
 /* ============================================================
  *  蓝牙遥控 (最高优先级)
@@ -15,39 +8,20 @@
  * ============================================================ */
 void Remote_Control_Update(chassis_move_t *chassis)
 {
-    switch (BT_GetMotion())
-    {
-        case BT_MOTION_FORWARD:
-            chassis->Vx_set =  BT_REMOTE_SPEED;
-            chassis->Vy_set =  0.0f;
-            chassis->Wz_set =  0.0f;
-            break;
+    uint8_t keys = BT_GetKeyState();
+    float   speed = chassis->remote.bt_speed;
+    float   wz    = chassis->remote.bt_wz;
 
-        case BT_MOTION_BACKWARD:
-            chassis->Vx_set = -BT_REMOTE_SPEED;
-            chassis->Vy_set =  0.0f;
-            chassis->Wz_set =  0.0f;
-            break;
+    chassis->Vx_set = 0.0f;
+    chassis->Vy_set = 0.0f;
+    chassis->Wz_set = 0.0f;
 
-        case BT_MOTION_LEFT:
-            chassis->Vx_set =  0.0f;
-            chassis->Vy_set =  BT_REMOTE_SPEED;
-            chassis->Wz_set =  0.0f;
-            break;
-
-        case BT_MOTION_RIGHT:
-            chassis->Vx_set =  0.0f;
-            chassis->Vy_set = -BT_REMOTE_SPEED;
-            chassis->Wz_set =  0.0f;
-            break;
-
-        case BT_MOTION_STOP:
-        default:
-            chassis->Vx_set = 0.0f;
-            chassis->Vy_set = 0.0f;
-            chassis->Wz_set = 0.0f;
-            break;
-    }
+    if (keys & BT_KEY_FORWARD)      chassis->Vx_set -= speed;
+    if (keys & BT_KEY_BACKWARD)     chassis->Vx_set += speed;
+    if (keys & BT_KEY_LEFT)         chassis->Vy_set += speed;
+    if (keys & BT_KEY_RIGHT)        chassis->Vy_set -= speed;
+    if (keys & BT_KEY_ROTATE_LEFT)  chassis->Wz_set += wz;
+    if (keys & BT_KEY_ROTATE_RIGHT) chassis->Wz_set -= wz;
 }
 
 /* ============================================================
@@ -57,13 +31,19 @@ void Remote_Control_Update(chassis_move_t *chassis)
  * ============================================================ */
 void Remote_WeChat_Update(chassis_move_t *chassis)
 {
-    float out_vx = chassis->cmd_vel.vx * WECHAT_VX_SCALE;
-    float out_wz = chassis->cmd_vel.vz * WECHAT_VZ_SCALE;
+    float vx_scale = chassis->remote.wechat_vx_scale;
+    float vz_scale = chassis->remote.wechat_vz_scale;
+    float gain     = chassis->remote.wechat_speed_gain;
+    float max_vx   = chassis->remote.wechat_max_speed;
+    float max_wz   = chassis->remote.wechat_max_wz;
 
-    if (out_vx >  WECHAT_MAX_SPEED) out_vx =  WECHAT_MAX_SPEED;
-    if (out_vx < -WECHAT_MAX_SPEED) out_vx = -WECHAT_MAX_SPEED;
-    if (out_wz >  WECHAT_MAX_WZ)    out_wz =  WECHAT_MAX_WZ;
-    if (out_wz < -WECHAT_MAX_WZ)    out_wz = -WECHAT_MAX_WZ;
+    float out_vx = chassis->cmd_vel.vx * vx_scale * gain;
+    float out_wz = chassis->cmd_vel.vz * vz_scale * gain;
+
+    if (out_vx >  max_vx) out_vx =  max_vx;
+    if (out_vx < -max_vx) out_vx = -max_vx;
+    if (out_wz >  max_wz) out_wz =  max_wz;
+    if (out_wz < -max_wz) out_wz = -max_wz;
 
     chassis->Vx_set = out_vx;
     chassis->Vy_set = 0.0f;
@@ -75,20 +55,20 @@ void Remote_WeChat_Update(chassis_move_t *chassis)
  *  纯 ROS cmd_vel 控制, 无 GPS 参与
  *  vx → 前向速度, vz → 旋转速度
  * ============================================================ */
-#define ROS_LINE_VX_SCALE  100.0f
-#define ROS_LINE_VZ_SCALE   30.0f
-#define ROS_LINE_MAX_SPEED  50.0f
-#define ROS_LINE_MAX_WZ     25.0f
-
 void Remote_ROS_Update(chassis_move_t *chassis)
 {
-    float out_vx = chassis->cmd_vel.vx * ROS_LINE_VX_SCALE;
-    float out_wz = chassis->cmd_vel.vz * ROS_LINE_VZ_SCALE;
+    float vx_scale = chassis->remote.ros_vx_scale;
+    float vz_scale = chassis->remote.ros_vz_scale;
+    float max_vx   = chassis->remote.ros_max_speed;
+    float max_wz   = chassis->remote.ros_max_wz;
 
-    if (out_vx >  ROS_LINE_MAX_SPEED) out_vx =  ROS_LINE_MAX_SPEED;
-    if (out_vx < -ROS_LINE_MAX_SPEED) out_vx = -ROS_LINE_MAX_SPEED;
-    if (out_wz >  ROS_LINE_MAX_WZ)    out_wz =  ROS_LINE_MAX_WZ;
-    if (out_wz < -ROS_LINE_MAX_WZ)    out_wz = -ROS_LINE_MAX_WZ;
+    float out_vx = chassis->cmd_vel.vx * vx_scale;
+    float out_wz = chassis->cmd_vel.vz * vz_scale;
+
+    if (out_vx >  max_vx) out_vx =  max_vx;
+    if (out_vx < -max_vx) out_vx = -max_vx;
+    if (out_wz >  max_wz) out_wz =  max_wz;
+    if (out_wz < -max_wz) out_wz = -max_wz;
 
     chassis->Vx_set = out_vx;
     chassis->Vy_set = 0.0f;

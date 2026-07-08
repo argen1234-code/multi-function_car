@@ -31,6 +31,9 @@ static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
 /* 全局唯一的底盘实例 (外部不可直接访问, 仅通过指针传递) */
 static chassis_move_t    chassis_move    = {0};
 volatile int gui_req_mode = -1;
+volatile CarMode_t chassis_current_mode_debug = CAR_MODE_GPS;
+volatile int chassis_last_bt_req_debug = BT_MODE_REQ_NONE;
+static uint8_t chassis_manual_indoor_mode = 0U;
 
 /* Keil Watch 调试: 直接输入 chassis_debug 即可展开结构体 */
 chassis_move_t *const chassis_debug = &chassis_move;
@@ -56,6 +59,13 @@ static void chassis_start_gps_navigation(chassis_move_t *chassis)
                               CHASSIS_GPS_ROUTE_COUNT);
 }
 
+static uint8_t chassis_is_jetson_online(chassis_move_t *chassis)
+{
+    if (chassis == NULL) return 0U;
+
+    return (HAL_GetTick() - chassis->jetson_last_tick < JETSON_TIMEOUT_MS) ? 1U : 0U;
+}
+
 /* ============================================================
  *  公开: 切换车辆工作模式
  * ============================================================ */
@@ -66,6 +76,12 @@ void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode)
     Navigation_Stop(chassis);
     chassis_stop(chassis);
     chassis->mode = mode;
+    chassis_current_mode_debug = mode;
+
+    if (mode != CAR_MODE_VOICE)
+    {
+        App_Voice_Clear();
+    }
 
     if (mode == CAR_MODE_GPS)
     {
@@ -159,6 +175,26 @@ static void chassis_init(chassis_move_t *chassis)
     uart_init(&huart2, UART_DMA_ToIdle_RX);
     JY901S_Init();
 
+    /* 遥控控制量默认值 */
+    chassis->remote.bt_speed         = BT_REMOTE_SPEED;
+    chassis->remote.bt_wz            = BT_REMOTE_WZ;
+    chassis->remote.wechat_vx_scale  = WECHAT_VX_SCALE;
+    chassis->remote.wechat_vz_scale  = WECHAT_VZ_SCALE;
+    chassis->remote.wechat_speed_gain = WECHAT_SPEED_GAIN;
+    chassis->remote.wechat_max_speed = WECHAT_MAX_SPEED;
+    chassis->remote.wechat_max_wz    = WECHAT_MAX_WZ;
+    chassis->remote.ros_vx_scale     = ROS_LINE_VX_SCALE;
+    chassis->remote.ros_vz_scale     = ROS_LINE_VZ_SCALE;
+    chassis->remote.ros_max_speed    = ROS_LINE_MAX_SPEED;
+    chassis->remote.ros_max_wz       = ROS_LINE_MAX_WZ;
+
+    /* 各模式控制增益默认值 */
+    chassis->gain.gps    = CHASSIS_GAIN_GPS;
+    chassis->gain.indoor = CHASSIS_GAIN_INDOOR;
+    chassis->gain.remote = CHASSIS_GAIN_REMOTE;
+    chassis->gain.line   = CHASSIS_GAIN_LINE;
+    chassis->gain.voice  = CHASSIS_GAIN_VOICE;
+
     /* WonderEcho 上电后需要短暂稳定时间，再初始化 PB0/PB1 软件 I2C。
        初始化仍放在底盘任务内完成，不新增 FreeRTOS 任务，避免多处同时写底盘速度。 */
     osDelay(200);
@@ -184,6 +220,8 @@ static void chassis_init(chassis_move_t *chassis)
  * ============================================================ */
 void chassis_control_loop(chassis_move_t *chassis)
 {
+    if (chassis == NULL) return;
+
     /* 1. 全向运动学分解: Vx/Vy/Wz → 4路电机目标转速 */
     chassis->motor[0].speed_set =  chassis->Vx_set + chassis->Vy_set + chassis->Wz_set;
     chassis->motor[1].speed_set =  chassis->Vx_set - chassis->Vy_set - chassis->Wz_set;
@@ -205,29 +243,133 @@ void chassis_control_loop(chassis_move_t *chassis)
  * ============================================================ */
 void chassis_mode_change(chassis_move_t *chassis)
 {
-    BT_ModeReq_t req = BT_GetAndClearModeReq();
+    BT_ModeReq_t req;
+    CarMode_t requested_mode;
+    uint8_t jetson_online;
+    uint8_t jetson_mode;
+
+    if (chassis == NULL) return;
 
     if (gui_req_mode >= 0 && gui_req_mode <= 4) {
-        Chassis_SetMode(chassis, (CarMode_t)gui_req_mode);
+        requested_mode = (CarMode_t)gui_req_mode;
+        chassis_manual_indoor_mode = (requested_mode == CAR_MODE_INDOOR) ? 1U : 0U;
+        Chassis_SetMode(chassis, requested_mode);
         gui_req_mode = -1;
         return;
+    }
+
+    req = BT_GetAndClearModeReq();
+    if (req != BT_MODE_REQ_NONE)
+    {
+        chassis_last_bt_req_debug = req;
     }
 
     switch (req)
     {
         case BT_MODE_REQ_GPS:
+            chassis_manual_indoor_mode = 0U;
             Chassis_SetMode(chassis, CAR_MODE_GPS);
-            break;
+            return;
 
         case BT_MODE_REQ_INDOOR:
+            chassis_manual_indoor_mode = 1U;
             Chassis_SetMode(chassis, CAR_MODE_INDOOR);
-            break;
+            return;
 
         default:
             break;
     }
-		
-		//chassis->mode = CAR_MODE_REMOTE;
+
+    if (BT_IsActive())
+    {
+        chassis_manual_indoor_mode = 1U;
+        if (chassis->mode != CAR_MODE_INDOOR)
+        {
+            Chassis_SetMode(chassis, CAR_MODE_INDOOR);
+        }
+        return;
+    }
+
+    if (chassis_manual_indoor_mode)
+    {
+        if (chassis->mode != CAR_MODE_INDOOR)
+        {
+            Chassis_SetMode(chassis, CAR_MODE_INDOOR);
+        }
+        return;
+    }
+
+    if (App_Voice_IsActive())
+    {
+        if (chassis->mode != CAR_MODE_VOICE)
+        {
+            Chassis_SetMode(chassis, CAR_MODE_VOICE);
+        }
+        return;
+    }
+
+    jetson_online = chassis_is_jetson_online(chassis);
+    jetson_mode = chassis->cmd_vel.mode;
+
+    if (jetson_online)
+    {
+        if (jetson_mode == JETSON_MODE_REMOTE)
+        {
+            if (chassis->mode != CAR_MODE_REMOTE)
+            {
+                Chassis_SetMode(chassis, CAR_MODE_REMOTE);
+            }
+            return;
+        }
+
+        if (jetson_mode == JETSON_MODE_LINE)
+        {
+            if (chassis->mode != CAR_MODE_LINE)
+            {
+                Chassis_SetMode(chassis, CAR_MODE_LINE);
+            }
+            return;
+        }
+
+        if (jetson_mode == JETSON_MODE_GPS)
+        {
+            if (chassis->mode != CAR_MODE_GPS)
+            {
+                Chassis_SetMode(chassis, CAR_MODE_GPS);
+            }
+            return;
+        }
+    }
+
+    if (chassis->mode == CAR_MODE_REMOTE || chassis->mode == CAR_MODE_LINE)
+    {
+        Chassis_SetMode(chassis, CAR_MODE_GPS);
+    }
+}
+
+/* ============================================================
+ *  内部: 各模式控制增益放大
+ *  在 chassis_set_control 末尾调用，对 Vx/Vy/Wz 统一乘增益
+ * ============================================================ */
+static void chassis_apply_gain(chassis_move_t *chassis)
+{
+    float gain = 1.0f;
+
+    if (chassis == NULL) return;
+
+    switch (chassis->mode)
+    {
+        case CAR_MODE_GPS:    gain = chassis->gain.gps;    break;
+        case CAR_MODE_INDOOR: gain = chassis->gain.indoor; break;
+        case CAR_MODE_REMOTE: gain = chassis->gain.remote; break;
+        case CAR_MODE_LINE:   gain = chassis->gain.line;   break;
+        case CAR_MODE_VOICE:  gain = chassis->gain.voice;  break;
+        default: break;
+    }
+
+    chassis->Vx_set *= gain;
+    chassis->Vy_set *= gain;
+    chassis->Wz_set *= gain;
 }
 
 /* ============================================================
@@ -235,47 +377,77 @@ void chassis_mode_change(chassis_move_t *chassis)
  * ============================================================ */
 void chassis_set_control(chassis_move_t *chassis)
 {
-    uint8_t jetson_online =
-        (HAL_GetTick() - chassis->jetson_last_tick < JETSON_TIMEOUT_MS);
-    uint8_t jetson_mode = chassis->cmd_vel.mode;
+    uint8_t jetson_online;
+    uint8_t jetson_mode;
 
-    /* 1. 蓝牙遥控 — 最高优先级 */
-    if (BT_IsActive())
+    if (chassis == NULL) return;
+
+    jetson_online = chassis_is_jetson_online(chassis);
+    jetson_mode = chassis->cmd_vel.mode;
+
+    switch (chassis->mode)
     {
-        chassis->mode = CAR_MODE_INDOOR;
-        Remote_Control_Update(chassis);
-    }
-    /* 2. 微信小程序遥控 (Jetson mode=2) */
-    else if (jetson_online && jetson_mode == JETSON_MODE_REMOTE)
-    {
-        chassis->mode = CAR_MODE_REMOTE;
-        Remote_WeChat_Update(chassis);
-    }
-    /* 3. 室内 ROS 自主导航 (Jetson mode=3, 纯cmd_vel) */
-    else if (jetson_online && jetson_mode == JETSON_MODE_LINE)
-    {
-        chassis->mode = CAR_MODE_LINE;
-        Remote_ROS_Update(chassis);
-    }
-    /* 4. GPS + ROS 融合导航 (Jetson mode=1) */
-    else if (jetson_online && jetson_mode == JETSON_MODE_GPS)
-    {
-        chassis->mode = CAR_MODE_GPS;
-        Navigation_Update_Loop_Fusion(chassis);
-    }
-    /* 5. WonderEcho 语音识别控制
-       语音目标速度由 App_Voice_Recognition_Update() 写入，此处保持现状。 */
-    else if (chassis->mode == CAR_MODE_VOICE)
-    {
-    }
-    /* 6. 默认: 纯 GPS 导航 */
-    else
-    {
-        chassis->mode = CAR_MODE_GPS;
-        Navigation_Update_Loop(chassis);
+        case CAR_MODE_INDOOR:
+            if (BT_IsActive())
+            {
+                Remote_Control_Update(chassis);
+            }
+            else
+            {
+                chassis_stop(chassis);
+            }
+            break;
+
+        case CAR_MODE_REMOTE:
+            if (jetson_online && jetson_mode == JETSON_MODE_REMOTE)
+            {
+                Remote_WeChat_Update(chassis);
+            }
+            else
+            {
+                chassis_stop(chassis);
+            }
+            break;
+
+        case CAR_MODE_LINE:
+            if (jetson_online && jetson_mode == JETSON_MODE_LINE)
+            {
+                Remote_ROS_Update(chassis);
+            }
+            else
+            {
+                chassis_stop(chassis);
+            }
+            break;
+
+        case CAR_MODE_GPS:
+            if (jetson_online && jetson_mode == JETSON_MODE_GPS)
+            {
+                Navigation_Update_Loop_Fusion(chassis);
+            }
+            else
+            {
+                Navigation_Update_Loop(chassis);
+            }
+            break;
+
+        case CAR_MODE_VOICE:
+            if (App_Voice_IsActive())
+            {
+                App_Voice_ApplyControl(chassis);
+            }
+            else
+            {
+                chassis_stop(chassis);
+            }
+            break;
+
+        default:
+            chassis_stop(chassis);
+            break;
     }
 
-   
+    chassis_apply_gain(chassis);
 }
 
 /* ============================================================
@@ -283,8 +455,14 @@ void chassis_set_control(chassis_move_t *chassis)
  *    PID 输出 → 电机PWM
  *    遥测数据 → USB 回传 Jetson
  * ============================================================ */
+static void chassis_send_bt_ack(void);
+
 void chassis_send_cmd(chassis_move_t *chassis)
 {
+    if (chassis == NULL) return;
+
+    chassis_send_bt_ack();
+
     for (uint8_t i = 0; i < 4; i++)
     {
         Motor_SetPWM((int16_t)chassis->motor[i].speed_pid.Out, i);
@@ -293,6 +471,18 @@ void chassis_send_cmd(chassis_move_t *chassis)
     USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
                       chassis->date_to_usb.current_lat,
                       chassis->date_to_usb.current_lon);
+}
+
+static void chassis_send_bt_ack(void)
+{
+    uint8_t ack_count = BT_GetAndClearAckCount();
+    static const uint8_t ack_msg[] = {'o', 'k', '\r', '\n'};
+
+    while (ack_count > 0U)
+    {
+        HAL_UART_Transmit(&huart1, (uint8_t *)ack_msg, sizeof(ack_msg), 10U);
+        ack_count--;
+    }
 }
 
 
@@ -314,7 +504,6 @@ void chassis_task(void *pvParameters)
     /* -- 主循环 (100Hz) -- */
     while (1)
     {
-        chassis_mode_change(&chassis_move);       /* 蓝牙模式切换请求 */
         chassis_feedback_update(&chassis_move);   /* 传感器 + USB 数据刷新 */
         if (HAL_GetTick() - voice_tick >= 50U)
         {
@@ -322,10 +511,8 @@ void chassis_task(void *pvParameters)
             App_Voice_Recognition_Update(&chassis_move);
         }
         
-//				chassis_move.Vx_set = 50.0f;
-//        chassis_move.Vy_set = 0.0f;
-//        chassis_move.Wz_set = 0.0f;
-		chassis_set_control(&chassis_move);       /* 控制量设置 (优先级调度) */
+        chassis_mode_change(&chassis_move);       /* 模式切换 */
+		    chassis_set_control(&chassis_move);       /* 控制量设置 (优先级调度) */
         chassis_control_loop(&chassis_move);      /* 运动学 + PID */
         chassis_send_cmd(&chassis_move);          /* 电机输出 + USB遥测 */
         osDelay(10);
