@@ -11,14 +11,14 @@
 
 #define chassis_board_task 1
 
-/* ---- 各模式控制增益 (运行时可由 GUI / 调试器调整) ---- */
+/* ---- Per-mode control gain (runtime adjustable via GUI / debugger) ---- */
 #define CHASSIS_GAIN_GPS      1.0f
 #define CHASSIS_GAIN_INDOOR   1.0f
 #define CHASSIS_GAIN_REMOTE   1.0f
 #define CHASSIS_GAIN_LINE     1.0f
 #define CHASSIS_GAIN_VOICE    1.0f
 
-/* ---- 底盘电机速度PID参数 ---- */
+/* ---- Chassis motor speed PID parameters ---- */
 #define MOTOR_SPEED_PID_KP       1.05f
 #define MOTOR_SPEED_PID_KI       0.1f
 #define MOTOR_SPEED_PID_KD       0.1f
@@ -38,139 +38,234 @@
 #define MOTOR_SPEED_PID_MAX_IOUT 40.0f
 
 /* ============================================================
- *  IMU 姿态数据结构
+ *  IMU attitude data structures
  * ============================================================ */
 
-/* 四元数 (原始IMU输出) */
+/* Quaternion (raw IMU output) */
 typedef struct {
     float q0, q1, q2, q3;
 } Quaternion_t;
 
-/* INS 解算欧拉角 */
+/* INS-computed Euler angles */
 typedef struct {
-    float yaw;      /* 偏航角  0~360° */
-    float pitch;    /* 俯仰角 */
-    float roll;     /* 横滚角 */
+    float yaw;      /* Yaw   0~360 deg */
+    float pitch;    /* Pitch */
+    float roll;     /* Roll */
 } INS_Euler_t;
 
-/* INS 完整数据: 原始四元数 + 解算后的欧拉角 */
+/* INS full data: raw quaternion + computed Euler angles */
 typedef struct {
-    Quaternion_t quaternion;   /* 原始4元数 */
-    INS_Euler_t  euler;        /* 解算出的欧拉角 */
+    Quaternion_t quaternion;   /* Raw quaternion */
+    INS_Euler_t  euler;        /* Computed Euler angles */
 } INS_Data_t;
 
-/* IMU 子系统: 磁力计 + INS 姿态 */
+/* IMU subsystem: magnetometer + INS attitude */
 typedef struct {
-    EulerAngles mag;           /* QMC5883 磁力计欧拉角 */
-    INS_Data_t  ins;           /* IMU/INS 姿态数据 */
-    JY901S_Data_t jy901s;      /* JY901S 九轴数据 */
+    EulerAngles mag;                /* QMC5883 magnetometer Euler angles */
+    uint32_t mag_last_update_tick;   /* Magnetometer last update tick */
+    INS_Data_t  ins;                /* IMU/INS attitude data */
+    uint32_t ins_last_update_tick;   /* IMU last update tick */
+    JY901S_Data_t jy901s;           /* JY901S 9-axis sensor data */
 } IMU_Data_t;
 
 /* ============================================================
- *  底盘电机 + 速度PID
+ *  Chassis motor + speed PID
  * ============================================================ */
 
 typedef struct {
-    double speed;              /* 当前转速     (rpm, 编码器反馈) */
-    double speed_set;          /* 目标转速     (rpm) */
-    double angle;              /* 当前角度 */
-    double angle_set;          /* 目标角度 */
-    PID_t  speed_pid;          /* 速度环 PID 控制器 */
+    double speed;              /* Current speed (rpm, encoder feedback) */
+    double speed_set;          /* Target speed (rpm) */
+    double angle;              /* Current angle */
+    double angle_set;          /* Target angle */
+    uint32_t last_update_tick;  /* Encoder last update tick */
+    PID_t  speed_pid;          /* Speed loop PID controller */
 } chassis_motor_t;
 
 /* ============================================================
- *  车辆工作模式
+ *  Vehicle operating modes
  * ============================================================ */
 
 typedef enum {
-    CAR_MODE_GPS = 0,          /* GPS 导航 (默认纯GPS, Jetson在线时融合ROS) */
-    CAR_MODE_REMOTE,           /* 微信小程序遥控 (Jetson转发) */
-    CAR_MODE_LINE,             /* 室内 ROS 自主导航 (Jetson mode=3) */
-    CAR_MODE_INDOOR,           /* 蓝牙遥控 */
-    CAR_MODE_VOICE             /* WonderEcho 语音识别控制 */
+    CAR_MODE_IDLE = 0,          /* Idle (all control sources offline) */
+    CAR_MODE_GPS,               /* GPS-only navigation (no ROS fusion) */
+    CAR_MODE_GPS_ROS,           /* GPS + ROS fusion navigation (auto-upgrade when Jetson online) */
+    CAR_MODE_REMOTE,            /* WeChat mini-program remote (via Jetson) */
+    CAR_MODE_LINE,              /* Indoor ROS autonomous navigation */
+    CAR_MODE_INDOOR,            /* Bluetooth remote control */
+    CAR_MODE_VOICE              /* WonderEcho voice recognition control */
 } CarMode_t;
 
 /* ============================================================
- *  USB 回传数据 (STM32 → Jetson)
+ *  USB telemetry data (STM32 -> Jetson)
  * ============================================================ */
 
 typedef struct {
-    float heading_to_target_deg;   /* 目标相对车头方位: 0°=正前, 90°=右侧, 180°=后方, 270°=左侧, 顺时针为正 [0,360) */
-    float current_lat;             /* 当前纬度 (十进制) */
-    float current_lon;             /* 当前经度 (十进制) */
+    float heading_to_target_deg;   /* Target bearing relative to heading: 0=front, 90=right, 180=rear, 270=left, CW [0,360) */
+    float current_lat;             /* Current latitude (decimal) */
+    float current_lon;             /* Current longitude (decimal) */
+    uint8_t current_sats;          /* Satellites in use */
+    uint32_t last_update_tick;     /* GPS last valid fix timestamp */
+    uint16_t current_year;         /* Beijing time year */
+    uint8_t current_month;         /* Beijing time month */
+    uint8_t current_day;           /* Beijing time day */
+    uint8_t current_week;          /* Beijing time weekday (0=Sun) */
+    uint8_t current_hour;          /* Beijing time hour */
+    uint8_t current_minute;        /* Beijing time minute */
+    uint8_t current_second;        /* Beijing time second */
+    uint32_t time_update_tick;     /* GPS time last update tick */
 } date_to_usb_t;
 
 /* ============================================================
- *  各模式控制增益结构体
+ *  Per-mode control gain struct
  * ============================================================ */
 typedef struct {
-    float gps;      /* GPS 导航增益 */
-    float indoor;   /* 蓝牙遥控增益 */
-    float remote;   /* 微信遥控增益 */
-    float line;     /* ROS 室内导航增益 */
-    float voice;    /* 语音控制增益 */
+    float gps;      /* GPS navigation gain */
+    float indoor;   /* Bluetooth remote gain */
+    float remote;   /* WeChat remote gain */
+    float line;     /* ROS indoor navigation gain */
+    float voice;    /* Voice control gain */
 } chassis_gain_t;
 
 /* ============================================================
- *  底盘全向移动总控制结构体
- *  (实例在 app_chassis_board.c, 外部通过指针传递)
+ *  Speed PID parameter struct (runtime adjustable)
+ * ============================================================ */
+typedef struct {
+    double kp;          /* Proportional gain */
+    double ki;          /* Integral gain */
+    double kd;          /* Derivative gain */
+    double max_out;     /* Output limit */
+    double max_iout;    /* Integral output limit */
+} chassis_pid_param_t;
+
+/* ============================================================
+ *  Chassis omnidirectional motion control struct
+ *  (singleton instance in app_chassis_board.c, access via pointer)
  * ============================================================ */
 
 typedef struct chassis_move_s {
-    /* ---- IMU 传感器 ---- */
-    IMU_Data_t          imu;       /* 磁力计 + INS 姿态 */
+    /* ---- IMU sensors ---- */
+    IMU_Data_t          imu;       /* Magnetometer + INS attitude */
 
-    /* ---- GPS 导航 ---- */
-    Navigation_State_t  nav;       /* 导航控制器状态 */
+    /* ---- GPS navigation ---- */
+    Navigation_State_t  nav;       /* Navigation controller state */
 
-    /* ---- 工作模式 ---- */
-    CarMode_t           mode;      /* 当前模式 */
+    /* ---- Operating mode ---- */
+    CarMode_t           mode;      /* Current mode */
 
-    /* ---- USB 下发的 Jetson 数据 ---- */
-    cmd_vel_t           cmd_vel;        /* 最新帧解析结果 (mode + vx + vz) */
-    uint32_t            jetson_last_tick; /* 最后一次收到有效帧的时间戳 */
+    /* ---- USB Jetson downstream data ---- */
+    cmd_vel_t           cmd_vel;        /* Latest frame parse result (mode + vx + vz) */
+    uint32_t            jetson_last_tick; /* Last valid Jetson frame tick */
 
-    /* ---- USB 回传数据 ---- */
-    date_to_usb_t       date_to_usb; /* STM32 → Jetson */
+    /* ---- USB telemetry data ---- */
+    date_to_usb_t       date_to_usb; /* STM32 -> Jetson */
 
-    /* ---- 遥控控制量参数 ---- */
-    RemoteControl_t     remote;     /* 各遥控模式控制量 (运行时可调) */
+    /* ---- Remote control parameters ---- */
+    RemoteControl_t     remote;     /* Per-mode remote control params (runtime adjustable) */
 
-    /* ---- 控制增益 ---- */
-    chassis_gain_t      gain;       /* 各模式 Vx/Vy/Wz 增益 */
+    /* ---- Control gains ---- */
+    chassis_gain_t      gain;       /* Per-mode Vx/Vy/Wz gain */
 
-    /* ---- 全向移动目标速度 (运动学分解前的合速度) ---- */
-    float Vx_set;                  /* X 轴目标速度  (纵向) */
-    float Vy_set;                  /* Y 轴目标速度  (横向) */
-    float Wz_set;                  /* Z 轴目标角速度 (旋转) */
+    /* ---- PID parameters ---- */
+    chassis_pid_param_t pid_param;  /* Runtime-adjustable speed PID params */
 
-    /* ---- 4 路电机 [FL:前左, FR:前右, RL:后左, RR:后右] ---- */
+    /* ---- Omnidirectional target velocity (before kinematic decomposition) ---- */
+    float Vx_set;                  /* X-axis target velocity (longitudinal) */
+    float Vy_set;                  /* Y-axis target velocity (lateral) */
+    float Wz_set;                  /* Z-axis target angular velocity (rotation) */
+
+    /* ---- 4 motors [FL:front-left, FR:front-right, RL:rear-left, RR:rear-right] ---- */
     chassis_motor_t     motor[4];
 
 } chassis_move_t;
 
 /* ============================================================
- *  控制量结构体 (云台 / 舵机 / 辅助控制等)
+ *  Gain parameter selector enums for chassis_set_gain_param()
  * ============================================================ */
+typedef enum {
+    CHASSIS_GAIN_PARAM_GPS = 0,
+    CHASSIS_GAIN_PARAM_INDOOR,
+    CHASSIS_GAIN_PARAM_REMOTE,
+    CHASSIS_GAIN_PARAM_LINE,
+    CHASSIS_GAIN_PARAM_VOICE
+} ChassisGainParam_t;
 
-typedef struct {
-    float aux1;          /* 预留控制量 1 */
-    float aux2;          /* 预留控制量 2 */
-    float aux3;          /* 预留控制量 3 */
-} chassis_control_t;
+typedef enum {
+    CHASSIS_REMOTE_PARAM_BT_SPEED = 0,
+    CHASSIS_REMOTE_PARAM_BT_WZ,
+    CHASSIS_REMOTE_PARAM_WECHAT_VX_SCALE,
+    CHASSIS_REMOTE_PARAM_ROS_MAX_SPEED
+} ChassisRemoteParam_t;
+
+typedef enum {
+    CHASSIS_PID_PARAM_KP = 0,
+    CHASSIS_PID_PARAM_KI,
+    CHASSIS_PID_PARAM_KD,
+    CHASSIS_PID_PARAM_MAX_OUT
+} ChassisPidParam_t;
 
 /* ============================================================
- *  外部接口
+ *  Telemetry snapshot (read-only copy for LVGL display)
+ * ============================================================ */
+typedef struct {
+    CarMode_t mode;
+    float gps_lat;
+    float gps_lon;
+    uint8_t gps_sats;
+    uint32_t gps_last_update_tick;
+    uint16_t gps_year;
+    uint8_t gps_month;
+    uint8_t gps_day;
+    uint8_t gps_week;
+    uint8_t gps_hour;
+    uint8_t gps_minute;
+    uint8_t gps_second;
+    uint32_t gps_time_update_tick;
+    float ins_roll;
+    float ins_pitch;
+    float ins_yaw;
+    uint32_t ins_last_update_tick;
+    float mag_yaw;
+    float mag_pitch;
+    float mag_roll;
+    uint32_t mag_last_update_tick;
+    float vx_set;
+    float vy_set;
+    float wz_set;
+    double motor_speed[4];
+    double motor_speed_set[4];
+    uint32_t motor_last_update_tick[4];
+    uint8_t qmc_calibrating;
+    uint16_t qmc_calibration_remaining_s;
+} ChassisTelemetry_t;
+
+/* ============================================================
+ *  Settings snapshot (read-only copy of current settings)
+ * ============================================================ */
+typedef struct {
+    chassis_gain_t gain;
+    RemoteControl_t remote;
+    chassis_pid_param_t pid_param;
+} ChassisSettings_t;
+
+/* ============================================================
+ *  External interface
  * ============================================================ */
 
 extern void chassis_task(void *pvParameters);
-extern void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode);
+extern void chassis_get_status_text(char *buf, uint32_t size);
+extern void chassis_get_telemetry(ChassisTelemetry_t *out);
+extern void chassis_get_settings(ChassisSettings_t *out);
+extern void chassis_set_gain_param(ChassisGainParam_t param, float value);
+extern void chassis_set_remote_param(ChassisRemoteParam_t param, float value);
+extern void chassis_set_pid_param(ChassisPidParam_t param, double value);
+extern void chassis_request_mode(CarMode_t mode);
 
-extern volatile int gui_req_mode;   /* GUI mode request (-1=none, 0..4=CarMode_t) */
+extern volatile int gui_req_mode;   /* GUI mode request (-1=none, 0..6=CarMode_t) */
 extern volatile CarMode_t chassis_current_mode_debug;
 extern volatile int chassis_last_bt_req_debug;
+extern chassis_move_t *const chassis_debug;
 
-/* 主循环 5 步骤 (定义于此, 便于外部模块替换实现) */
+/* Main loop 5 steps (defined here for external module replacement) */
 extern void chassis_mode_change(chassis_move_t *chassis);
 extern void chassis_feedback_update(chassis_move_t *chassis);
 extern void chassis_set_control(chassis_move_t *chassis);

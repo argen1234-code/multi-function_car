@@ -4,9 +4,16 @@
 extern I2C_HandleTypeDef hi2c1; 
 
 CalibParams params;
+volatile uint8_t qmc5883_calibrating = 0U;
+volatile uint16_t qmc5883_calibration_remaining_s = 0U;
 
 #define RAD_TO_DEG  (180.0 / 3.14159265358979323846)
 
+/**
+ * Initialize the QMC5883 magnetometer.
+ * Configures control registers for continuous measurement mode (200 Hz ODR,
+ * +/- 2 Gauss range, 512 OSR) and runs a 30-second calibration routine.
+ */
 void QMC5883_Init(void)
 {
     
@@ -21,12 +28,21 @@ void QMC5883_Init(void)
     data = 0x01;
     HAL_I2C_Mem_Write(&hi2c1, QMC5883_ADDR, 0x21, I2C_MEMADD_SIZE_8BIT, &data, 1, 100);
     
-    // 初始化时赋安全值，防止未经 Calibration 校准就直接除以0报错
+    /* Safe defaults before calibration completes */
     params.offset_x = 0; params.offset_y = 0; params.offset_z = 0;
     params.scale_x = 1.0f; params.scale_y = 1.0f; params.scale_z = 1.0f;
-		Magnetometer_Calibration();//磁力计校准30s
+		Magnetometer_Calibration();  /* Start 30s calibration */
 }
 
+/**
+ * Read raw 3-axis magnetometer data from the QMC5883.
+ * Reads 6 consecutive bytes from data register 0x00 via I2C.
+ * Output values are 16-bit signed integers in ADC counts.
+ *
+ * @param x  Pointer to store raw X-axis value.
+ * @param y  Pointer to store raw Y-axis value.
+ * @param z  Pointer to store raw Z-axis value.
+ */
 void QMC5883_ReadRawData(int16_t *x, int16_t *y, int16_t *z)
 {
     uint8_t buf[6];
@@ -39,10 +55,17 @@ void QMC5883_ReadRawData(int16_t *x, int16_t *y, int16_t *z)
     *z = (int16_t)(buf[5] << 8 | buf[4]);
 }
 
+/**
+ * Perform magnetometer hard-iron calibration.
+ * The sensor should be rotated through all axes during the ~30-second
+ * routine.  Records per-axis min/max values across 1000 samples, then
+ * computes offset (center) and scale correction factors.  A calibration
+ * LED blinks every 300 ms while active.
+ */
 void Magnetometer_Calibration(void)
 {
-    static int16_t min_x = 32767;  // 初始化为一个极大值
-    static int16_t max_x = -32768; // 初始化为一个极小值
+    static int16_t min_x = 32767;  /* Init to max value */
+    static int16_t max_x = -32768; /* Init to min value */
     static int16_t min_y = 32767;
     static int16_t max_y = -32768;
     static int16_t min_z = 32767;
@@ -50,9 +73,13 @@ void Magnetometer_Calibration(void)
 
     int16_t temp_hx, temp_hy, temp_hz;
     
-    // 原理：带着车绕原地转最大的几圈，记录全域磁场最大最小阈值
+    /* Rotate in place or figure-8 to record full-range magnetic min/max */
+    qmc5883_calibrating = 1U;
+    qmc5883_calibration_remaining_s = 30U;
+
     for (int i = 0; i < 1000; i++)
     {
+        qmc5883_calibration_remaining_s = (uint16_t)(((1000 - i) * 30 + 999) / 1000);
         QMC5883_ReadRawData(&temp_hx, &temp_hy, &temp_hz);
 
         if (temp_hx < min_x) min_x = temp_hx;
@@ -62,7 +89,7 @@ void Magnetometer_Calibration(void)
         if (temp_hz < min_z) min_z = temp_hz;
         if (temp_hz > max_z) max_z = temp_hz;
 
-        //  校准中LED 闪烁 (每 10 次循环，约 300ms 翻转一次)
+    /* Calibration done, LED off */
         if (i % 10 == 0) 
         {
 #if defined(LED_GPIO_Port) && defined(LED_Pin)
@@ -75,12 +102,15 @@ void Magnetometer_Calibration(void)
         HAL_Delay(30); 
     }
 
-    //  校准完成，LED 常亮
+    /* Calibration done, LED off */
 #if defined(LED_GPIO_Port) && defined(LED_Pin)
     HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET); 
 #else
     //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET); 
 #endif
+
+    qmc5883_calibrating = 0U;
+    qmc5883_calibration_remaining_s = 0U;
 
     params.offset_x = (max_x + min_x) / 2.0f;
     params.offset_y = (max_y + min_y) / 2.0f;
@@ -94,7 +124,7 @@ void Magnetometer_Calibration(void)
     if (scale_y > max_scale) max_scale = scale_y;
     if (scale_z > max_scale) max_scale = scale_z;
 
-    // 防止除以 0 崩溃
+    /* Avoid divide-by-zero */
     if(max_scale > 0) {
         params.scale_x = scale_x / max_scale;
         params.scale_y = scale_y / max_scale;
@@ -102,6 +132,15 @@ void Magnetometer_Calibration(void)
     }
 }
 
+/**
+ * Read magnetometer data with calibration applied.
+ * Reads raw ADC values, subtracts hard-iron offset, and normalizes by
+ * the per-axis scale factor computed during calibration.
+ *
+ * @param hx  Pointer to store calibrated X-axis value (normalized).
+ * @param hy  Pointer to store calibrated Y-axis value (normalized).
+ * @param hz  Pointer to store calibrated Z-axis value (normalized).
+ */
 void QMC5883_Get_CalibrationData(float *hx, float *hy, float *hz)
 {
     int16_t temp_hx = 0;
@@ -114,6 +153,14 @@ void QMC5883_Get_CalibrationData(float *hx, float *hy, float *hz)
     *hz = ((float)temp_hz - params.offset_z) * params.scale_z;
 }
 
+/**
+ * Compute Euler angles from calibrated magnetometer data.
+ * Reads calibrated field values, then calculates yaw (0--360 deg),
+ * pitch (-180--+180 deg), and roll (-180--+180 deg) using arctan
+ * formulas suitable for a 2-axis compass on a level platform.
+ *
+ * @param angles  Pointer to EulerAngles struct to fill.
+ */
 void QMC5883_GetAngles(EulerAngles *angles)
 {
     static float x = 0;
@@ -122,15 +169,16 @@ void QMC5883_GetAngles(EulerAngles *angles)
 
     QMC5883_Get_CalibrationData(&x, &y, &z);
 
-    // 计算偏航角 (Yaw) -- 在平面运动通常只要看这个，这是代替双天线的关键参数
+    /* Compute Yaw -- primary angle for planar motion */
     angles->yaw = atan2((double)y, (double)x) * RAD_TO_DEG;
     if(angles->yaw < 0) angles->yaw += 360.0f;
 
-    // 计算俯仰角 (Pitch)
+    /* Compute Pitch */
     angles->pitch = atan2((double)y, sqrt(x*x + z*z)) * RAD_TO_DEG;
 
-    // 计算横滚角 (Roll)
+    /* Compute Roll */
     angles->roll = atan2((double)x, sqrt(y*y + z*z)) * RAD_TO_DEG;
+    angles->last_update_tick = HAL_GetTick();
 
 }
 

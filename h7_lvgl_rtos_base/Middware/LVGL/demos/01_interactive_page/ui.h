@@ -16,6 +16,17 @@ extern "C" {
 #include "ui_helpers.h"
 #include "ui_events.h"
 
+#define UI_COLOR_BG          0xFFFFFF
+#define UI_COLOR_CARD        0xF8FAFA
+#define UI_COLOR_CYAN_SOFT   0xCEEFF0
+#define UI_COLOR_CYAN        0x05AFB5
+#define UI_COLOR_CYAN_DARK   0x047B80
+#define UI_COLOR_BLUE_DARK   0x233D4F
+#define UI_COLOR_TEXT        0x233D4F
+#define UI_COLOR_TEXT_MUTED  0x4B5563
+#define UI_COLOR_ORANGE      0xF59E0B
+#define UI_COLOR_DANGER      0xEF4444
+
 
 ///////////////////// SCREENS ////////////////////
 
@@ -35,10 +46,10 @@ extern lv_obj_t * ui____initial_actions0;
 
 // IMAGES AND IMAGE SETS
 extern lv_img_dsc_t ui_img_1301672413;
-extern lv_img_dsc_t ui_img_380527393;    // assets/屏幕截图 2026-06-22 110729.png
-extern lv_img_dsc_t ui_img_1565185032;    // assets/屏幕截图 2026-06-22 111053.png
-extern lv_img_dsc_t ui_img_1614311220;    // assets/屏幕截图 2026-06-22 111000.png
-extern lv_img_dsc_t ui_img_1943878613;    // assets/屏幕截图 2026-02-06 135759 (1).png
+extern lv_img_dsc_t ui_img_380527393;    // assets/screenshot 2026-06-22 110729.png
+extern lv_img_dsc_t ui_img_1565185032;    // assets/screenshot 2026-06-22 111053.png
+extern lv_img_dsc_t ui_img_1614311220;    // assets/screenshot 2026-06-22 111000.png
+extern lv_img_dsc_t ui_img_1943878613;    // assets/screenshot 2026-02-06 135759 (1).png
 
 // FONTS
 LV_FONT_DECLARE(ui_font_Font1);

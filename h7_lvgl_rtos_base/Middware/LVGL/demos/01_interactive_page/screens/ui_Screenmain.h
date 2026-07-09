@@ -19,6 +19,7 @@ extern lv_obj_t * ui_Screenmain;
 extern lv_obj_t * ui_HEAD;
 extern lv_obj_t * ui_Label1;
 extern lv_obj_t * ui_Label5;
+extern lv_obj_t * ui_LabelStatus;
 extern lv_obj_t * ui_Panel4;
 extern lv_obj_t * ui_Label6;
 extern lv_obj_t * ui_Panel5;
@@ -40,4 +41,3 @@ extern lv_obj_t * ui_Label7;
 #endif
 
 #endif
-

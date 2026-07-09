@@ -3,11 +3,13 @@
 
 #define BT_TOKEN_MAX_LEN      16U
 #define BT_FRAME_MAX_LEN      64U
+#define BT_ONLINE_TIMEOUT_MS  3000U
 
 static volatile uint8_t      bt_cmd       = 'S';
 static volatile uint8_t      bt_key_state = 0U;
 static volatile BT_ModeReq_t bt_mode_req  = BT_MODE_REQ_NONE;
 static volatile uint8_t      bt_ack_count = 0U;
+static volatile uint32_t     bt_last_rx_tick = 0U;
 static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
 static uint8_t               bt_frame_active = 0U;
@@ -271,6 +273,7 @@ void BT_Init(void)
     bt_key_state = 0U;
     bt_mode_req  = BT_MODE_REQ_NONE;
     bt_ack_count = 0U;
+    bt_last_rx_tick = 0U;
     bt_frame_reset();
 }
 
@@ -310,6 +313,7 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
             if (ch == '\n')
             {
                 bt_frame_buf[bt_frame_len] = '\0';
+                bt_last_rx_tick = HAL_GetTick();
                 bt_process_payload(bt_frame_buf);
                 bt_frame_reset();
             }
@@ -347,6 +351,18 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
 uint8_t BT_IsActive(void)
 {
     return (bt_key_state != 0U) ? 1U : 0U;
+}
+
+uint8_t BT_IsOnline(void)
+{
+    uint32_t tick = bt_last_rx_tick;
+
+    if (BT_IsActive())
+    {
+        return 1U;
+    }
+
+    return (tick != 0U && (HAL_GetTick() - tick) <= BT_ONLINE_TIMEOUT_MS) ? 1U : 0U;
 }
 
 uint8_t BT_GetKeyState(void)

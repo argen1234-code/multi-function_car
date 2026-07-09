@@ -41,6 +41,7 @@ void _ui_roller_set_property(lv_obj_t * target, int id, int val);
 void _ui_slider_set_property(lv_obj_t * target, int id, int val);
 
 void _ui_screen_change(lv_obj_t ** target, lv_scr_load_anim_t fademode, int spd, int delay, void (*target_init)(void));
+uint8_t _ui_screen_load(lv_obj_t * target, lv_scr_load_anim_t fademode, int spd, int delay);
 
 void _ui_arc_increment(lv_obj_t * target, int val);
 

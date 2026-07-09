@@ -1,7 +1,7 @@
 /**
- * my_lvgl_task.c — LVGL GUI task (FreeRTOS)
- * Init: LVGL → SDMMC → TF images → UI → 50Hz loop
- * Auto-logout: 60s idle → Login
+ * my_lvgl_task.c --- LVGL GUI task (FreeRTOS)
+ * Init: LVGL -> SDMMC -> TF images -> UI -> 50Hz loop
+ * Auto-logout: 60s idle -> Login
  */
 #include "my_lvgl_task.h"
 #include "lvgl.h"
@@ -14,16 +14,18 @@
 #include <stdio.h>
 
 
-static uint32_t g_idle_sec = 0;
+#define AUTO_LOGOUT_MS  60000U
 
 static void idle_timer_cb(lv_timer_t *t)
 {
-	g_idle_sec++;
-	if (g_idle_sec >= 60) {
-		g_idle_sec = 0;
+	(void)t;
+
+	if (lv_disp_get_inactive_time(NULL) >= AUTO_LOGOUT_MS) {
 		if (lv_scr_act() != ui_Login) {
 			if (ui_Login_PwdTA) lv_textarea_set_text(ui_Login_PwdTA, "");
-			lv_scr_load_anim(ui_Login, LV_SCR_LOAD_ANIM_FADE_ON, 300, 0, false);
+			if (_ui_screen_load(ui_Login, LV_SCR_LOAD_ANIM_MOVE_LEFT, 300, 0)) {
+				lv_disp_trig_activity(NULL);
+			}
 		}
 	}
 }
@@ -31,7 +33,7 @@ static void idle_timer_cb(lv_timer_t *t)
 void touch_reset_idle(lv_event_t *e)
 {
 	(void)e;
-	g_idle_sec = 0;
+	lv_disp_trig_activity(NULL);
 }
 
 

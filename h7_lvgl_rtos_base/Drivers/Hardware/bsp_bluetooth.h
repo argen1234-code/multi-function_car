@@ -32,6 +32,7 @@ void           BT_Init(void);
 void           BT_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 BT_Motion_t    BT_GetMotion(void);
 uint8_t        BT_IsActive(void);
+uint8_t        BT_IsOnline(void);
 uint8_t        BT_GetKeyState(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
 uint8_t        BT_GetAndClearAckCount(void);

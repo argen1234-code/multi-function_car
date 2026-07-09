@@ -5,6 +5,29 @@
 
 #include "ui_helpers.h"
 
+static uint8_t ui_screen_switch_busy = 0U;
+
+static void ui_screen_switch_unlock_cb(lv_timer_t * t)
+{
+    (void)t;
+    ui_screen_switch_busy = 0U;
+}
+
+static void ui_screen_switch_unlock_after(uint32_t timeout)
+{
+    lv_timer_t * timer;
+
+    if(timeout < 80U) timeout = 80U;
+
+    timer = lv_timer_create(ui_screen_switch_unlock_cb, timeout, NULL);
+    if(timer) {
+        lv_timer_set_repeat_count(timer, 1);
+    }
+    else {
+        ui_screen_switch_busy = 0U;
+    }
+}
+
 void _ui_bar_set_property(lv_obj_t * target, int id, int val)
 {
     if(id == _UI_BAR_PROPERTY_VALUE_WITH_ANIM) lv_bar_set_value(target, val, LV_ANIM_ON);
@@ -51,9 +74,28 @@ void _ui_slider_set_property(lv_obj_t * target, int id, int val)
 
 void _ui_screen_change(lv_obj_t ** target, lv_scr_load_anim_t fademode, int spd, int delay, void (*target_init)(void))
 {
-    if(*target == NULL)
+    if(target == NULL) return;
+    if(*target == NULL && target_init)
         target_init();
-    lv_scr_load_anim(*target, fademode, spd, delay, false);
+    if(*target == NULL) return;
+    _ui_screen_load(*target, fademode, spd, delay);
+}
+
+uint8_t _ui_screen_load(lv_obj_t * target, lv_scr_load_anim_t fademode, int spd, int delay)
+{
+    uint32_t timeout;
+
+    if(target == NULL) return 0U;
+    if(lv_scr_act() == target) return 1U;
+    if(ui_screen_switch_busy) return 0U;
+
+    ui_screen_switch_busy = 1U;
+    lv_scr_load_anim(target, fademode, spd, delay, false);
+
+    timeout = (uint32_t)((spd > 0) ? spd : 0) + (uint32_t)((delay > 0) ? delay : 0) + 80U;
+    ui_screen_switch_unlock_after(timeout);
+
+    return 1U;
 }
 
 void _ui_arc_increment(lv_obj_t * target, int val)
@@ -66,13 +108,15 @@ void _ui_arc_increment(lv_obj_t * target, int val)
 void _ui_bar_increment(lv_obj_t * target, int val, int anm)
 {
     int old = lv_bar_get_value(target);
-    lv_bar_set_value(target, old + val, anm);
+    lv_anim_enable_t anim = anm ? LV_ANIM_ON : LV_ANIM_OFF;
+    lv_bar_set_value(target, old + val, anim);
 }
 
 void _ui_slider_increment(lv_obj_t * target, int val, int anm)
 {
     int old = lv_slider_get_value(target);
-    lv_slider_set_value(target, old + val, anm);
+    lv_anim_enable_t anim = anm ? LV_ANIM_ON : LV_ANIM_OFF;
+    lv_slider_set_value(target, old + val, anim);
     lv_event_send(target, LV_EVENT_VALUE_CHANGED, 0);
 }
 
@@ -120,7 +164,8 @@ void scr_unloaded_delete_cb(lv_event_t * e)
 
     // Get the destroy callback from user_data
 
-    screen_destroy_cb_t destroy_cb = lv_event_get_user_data(e);
+    void * user_data = lv_event_get_user_data(e);
+    screen_destroy_cb_t destroy_cb = (screen_destroy_cb_t)user_data;
     if(destroy_cb) {
 
         destroy_cb();  // call the specific screen destroy function

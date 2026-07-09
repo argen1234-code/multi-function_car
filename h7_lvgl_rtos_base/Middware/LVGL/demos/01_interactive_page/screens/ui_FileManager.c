@@ -1,9 +1,9 @@
 /**
- * ui_FileManager.c — TF card file browser with folder navigation
+ * ui_FileManager.c --- TF card file browser with folder navigation
  *
  * Uses LVGL FATFS driver (LV_USE_FS_FATFS, drive 'S').
- * Click folder → enter, ".." → go up, file → show info.
- * Screen touch → back to Screenmain.
+ * Click folder -> enter, ".." -> go up, file -> show info.
+ * Screen touch -> back to Screenmain.
  */
 #include "../ui.h"
 #include "../ui_helpers.h"
@@ -24,20 +24,20 @@ static void item_click_cb(lv_event_t *e);
 void ui_event_FileManager(lv_event_t *e)
 {
 	if (lv_event_get_code(e) == LV_EVENT_CLICKED || lv_event_get_code(e) == LV_EVENT_LONG_PRESSED || lv_event_get_code(e) == LV_EVENT_GESTURE) {
-		_ui_screen_change(&ui_Screenmain, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 200,
+		_ui_screen_change(&ui_Screenmain, LV_SCR_LOAD_ANIM_MOVE_TOP, 500, 200,
 		                  &ui_Screenmain_screen_init);
 	}
 }
 
 
-/* ---- item click: folder → enter, ".." → go up ---- */
+/* ---- item click: folder -> enter, ".." -> go up ---- */
 static void item_click_cb(lv_event_t *e)
 {
 	lv_obj_t *btn = lv_event_get_target(e);
 	const char *name = lv_list_get_btn_text(g_list, btn);
 	if (!name) return;
 
-	/* ".." → go up */
+	/* ".." -> go up */
 	if (strncmp(name, "..", 2) == 0) {
 		char *slash = strrchr(g_path, '/');
 		if (slash && slash > g_path + 2) {   /* not "S:" */
@@ -61,7 +61,7 @@ static void item_click_cb(lv_event_t *e)
 		return;
 	}
 
-	/* Not a directory — just show info (name kept in button) */
+	/* Not a directory --- just show info (name kept in button) */
 }
 
 
@@ -86,7 +86,7 @@ static void refresh_file_list(void)
 	if (strcmp(g_path, "S:/") != 0) {
 		lv_obj_t *up = lv_list_add_btn(g_list, NULL, "..");
 		lv_obj_set_style_border_side(up, LV_BORDER_SIDE_BOTTOM, 0);
-		lv_obj_set_style_border_color(up, lv_color_hex(0x333333), 0);
+		lv_obj_set_style_border_color(up, lv_color_hex(UI_COLOR_CYAN_SOFT), 0);
 		lv_obj_set_style_border_width(up, 1, 0);
 		lv_obj_add_event_cb(up, item_click_cb, LV_EVENT_CLICKED, NULL);
 	}
@@ -135,7 +135,7 @@ static void refresh_file_list(void)
 
 		lv_obj_t *btn = lv_list_add_btn(g_list, NULL, label);
 		lv_obj_set_style_border_side(btn, LV_BORDER_SIDE_BOTTOM, 0);
-		lv_obj_set_style_border_color(btn, lv_color_hex(0x333333), 0);
+		lv_obj_set_style_border_color(btn, lv_color_hex(UI_COLOR_CYAN_SOFT), 0);
 		lv_obj_set_style_border_width(btn, 1, 0);
 		lv_obj_add_event_cb(btn, item_click_cb, LV_EVENT_CLICKED, NULL);
 	}
@@ -151,19 +151,19 @@ void ui_FileManager_screen_init(void)
 
 	ui_FileManager = lv_obj_create(NULL);
 	lv_obj_clear_flag(ui_FileManager, LV_OBJ_FLAG_SCROLLABLE);
-	lv_obj_set_style_bg_color(ui_FileManager, lv_color_hex(0x1A1A2E), LV_PART_MAIN);
+	lv_obj_set_style_bg_color(ui_FileManager, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN);
 	lv_obj_set_style_bg_opa(ui_FileManager, 255, LV_PART_MAIN);
 
 	g_title = lv_label_create(ui_FileManager);
 	lv_label_set_text(g_title, "S:/");
-	lv_obj_set_style_text_color(g_title, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
+	lv_obj_set_style_text_color(g_title, lv_color_hex(UI_COLOR_BLUE_DARK), LV_PART_MAIN);
 	lv_obj_set_style_text_font(g_title, &lv_font_montserrat_14, LV_PART_MAIN);
 	lv_obj_set_align(g_title, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(g_title, 5);
 
 	lv_obj_t *hint = lv_label_create(ui_FileManager);
 	lv_label_set_text(hint, "Swipe to scroll | Tap screen to go back");
-	lv_obj_set_style_text_color(hint, lv_color_hex(0x888888), LV_PART_MAIN);
+	lv_obj_set_style_text_color(hint, lv_color_hex(UI_COLOR_TEXT_MUTED), LV_PART_MAIN);
 	lv_obj_set_align(hint, LV_ALIGN_BOTTOM_MID);
 	lv_obj_set_y(hint, -10);
 
