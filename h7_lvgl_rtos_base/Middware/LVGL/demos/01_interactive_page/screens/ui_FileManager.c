@@ -81,6 +81,9 @@ static void refresh_file_list(void)
 	lv_obj_set_size(g_list, 800, 440);
 	lv_obj_set_align(g_list, LV_ALIGN_CENTER);
 	lv_obj_set_y(g_list, 30);
+	lv_obj_set_style_radius(g_list, 10, 0);
+	lv_obj_set_style_bg_color(g_list, lv_color_hex(UI_COLOR_CARD), 0);
+	ui_apply_raised_panel(g_list);
 
 	/* ".." to go up (shown unless at root S:/) */
 	if (strcmp(g_path, "S:/") != 0) {
@@ -151,8 +154,7 @@ void ui_FileManager_screen_init(void)
 
 	ui_FileManager = lv_obj_create(NULL);
 	lv_obj_clear_flag(ui_FileManager, LV_OBJ_FLAG_SCROLLABLE);
-	lv_obj_set_style_bg_color(ui_FileManager, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN);
-	lv_obj_set_style_bg_opa(ui_FileManager, 255, LV_PART_MAIN);
+	ui_apply_gradient_background(ui_FileManager, 0xF8FBFF, 0xD7E6F2, LV_GRAD_DIR_VER);
 
 	g_title = lv_label_create(ui_FileManager);
 	lv_label_set_text(g_title, "S:/");

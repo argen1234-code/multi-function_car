@@ -179,6 +179,71 @@ void _ui_opacity_set(lv_obj_t * target, int val)
     lv_obj_set_style_opa(target, val, 0);
 }
 
+void ui_apply_gradient_background(lv_obj_t * target, uint32_t main_color, uint32_t grad_color, lv_grad_dir_t dir)
+{
+    if(target == NULL) return;
+
+#if LVGL_UI_ENABLE_ALL_BACKGROUND
+    lv_obj_set_style_bg_color(target, lv_color_hex(main_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_color(target, lv_color_hex(grad_color), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_dir(target, dir, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_main_stop(target, 80, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_grad_stop(target, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(target, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+#else
+    (void)main_color;
+    (void)grad_color;
+    (void)dir;
+    lv_obj_set_style_bg_color(target, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_bg_opa(target, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT);
+#endif
+}
+
+void ui_apply_rich_background(lv_obj_t * target)
+{
+    ui_apply_gradient_background(target, UI_COLOR_BG, UI_COLOR_CYAN_SOFT, LV_GRAD_DIR_VER);
+}
+
+void ui_apply_raised_panel(lv_obj_t * target)
+{
+    if(target == NULL) return;
+
+#if LVGL_UI_ENABLE_ALL_BACKGROUND
+    lv_obj_set_style_border_width(target, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(target, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_opa(target, LV_OPA_70, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(target, 10, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_ofs_x(target, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_ofs_y(target, 4, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_spread(target, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(target, lv_color_hex(UI_COLOR_BLUE_DARK), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(target, LV_OPA_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+#else
+    lv_obj_set_style_shadow_width(target, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(target, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+#endif
+}
+
+void ui_apply_raised_button(lv_obj_t * target)
+{
+    if(target == NULL) return;
+
+#if LVGL_UI_ENABLE_ALL_BACKGROUND
+    lv_obj_set_style_border_width(target, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_color(target, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_border_opa(target, LV_OPA_50, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_width(target, 6, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_ofs_x(target, 1, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_ofs_y(target, 2, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_spread(target, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_color(target, lv_color_hex(UI_COLOR_BLUE_DARK), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(target, LV_OPA_30, LV_PART_MAIN | LV_STATE_DEFAULT);
+#else
+    lv_obj_set_style_shadow_width(target, 0, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_shadow_opa(target, LV_OPA_TRANSP, LV_PART_MAIN | LV_STATE_DEFAULT);
+#endif
+}
+
 void _ui_anim_callback_free_user_data(lv_anim_t * a)
 {
     lv_mem_free(a->user_data);

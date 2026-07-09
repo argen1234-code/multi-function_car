@@ -138,8 +138,8 @@ static void settings_slider_cb(lv_event_t *e)
 static lv_obj_t *settings_make_tab(lv_obj_t *tv, const char *name)
 {
     lv_obj_t *tab = lv_tabview_add_tab(tv, name);
-    lv_obj_set_style_bg_color(tab, lv_color_hex(UI_COLOR_BG), 0);
-    lv_obj_set_style_pad_all(tab, 10, 0);
+    ui_apply_gradient_background(tab, 0xF8FAFA, 0xDFF4F5, LV_GRAD_DIR_VER);
+    lv_obj_set_style_pad_all(tab, 16, 0);
     lv_obj_set_scroll_dir(tab, LV_DIR_VER);
     return tab;
 }
@@ -165,23 +165,25 @@ static void settings_add_slider(lv_obj_t *parent, const char *name, uint8_t type
 
     row_index = lv_obj_get_child_cnt(parent);
     row = lv_obj_create(parent);
-    lv_obj_set_size(row, 900, 54);
-    lv_obj_set_pos(row, 10, (lv_coord_t)(row_index * 60U));
+    lv_obj_set_size(row, 930, 82);
+    lv_obj_set_pos(row, 8, (lv_coord_t)(row_index * 92U));
     lv_obj_set_style_bg_color(row, lv_color_hex(UI_COLOR_CARD), 0);
     lv_obj_set_style_border_color(row, lv_color_hex(UI_COLOR_CYAN_SOFT), 0);
     lv_obj_set_style_border_width(row, 1, 0);
     lv_obj_set_style_radius(row, 8, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    ui_apply_raised_panel(row);
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
     title = lv_label_create(row);
     lv_label_set_text(title, name);
     lv_obj_set_style_text_color(title, lv_color_hex(UI_COLOR_TEXT), 0);
     lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(title, 12, 17);
+    lv_obj_set_pos(title, 16, 12);
 
     item->slider = lv_slider_create(row);
-    lv_obj_set_size(item->slider, 470, 12);
-    lv_obj_set_pos(item->slider, 260, 21);
+    lv_obj_set_size(item->slider, 520, 14);
+    lv_obj_set_pos(item->slider, 205, 34);
     vmin = (int32_t)(min * (float)scale);
     vmax = (int32_t)(max * (float)scale);
     vcur = (int32_t)(settings_item_get(item) * (float)scale);
@@ -194,7 +196,7 @@ static void settings_add_slider(lv_obj_t *parent, const char *name, uint8_t type
 
     item->label = lv_label_create(row);
     lv_obj_set_width(item->label, 90);
-    lv_obj_set_pos(item->label, 760, 17);
+    lv_obj_set_pos(item->label, 805, 31);
     lv_obj_set_style_text_color(item->label, lv_color_hex(UI_COLOR_CYAN_DARK), 0);
     lv_obj_set_style_text_align(item->label, LV_TEXT_ALIGN_RIGHT, 0);
     settings_item_refresh(item);
@@ -218,7 +220,7 @@ static void settings_add_mode_button(lv_obj_t *parent, const char *name, CarMode
     lv_obj_set_size(btn, 130, 42);
     lv_obj_set_pos(btn, x, y);
     lv_obj_set_style_bg_color(btn, lv_color_hex(UI_COLOR_BLUE_DARK), 0);
-    lv_obj_set_style_shadow_width(btn, 0, 0);
+    ui_apply_raised_button(btn);
     lv_obj_add_event_cb(btn, settings_mode_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)mode);
 
     label = lv_label_create(btn);
@@ -296,7 +298,7 @@ void ui_Screensettings_screen_init(void)
 
     ui_Screensettings = lv_obj_create(NULL);
     lv_obj_clear_flag(ui_Screensettings, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
-    lv_obj_set_style_bg_color(ui_Screensettings, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_apply_gradient_background(ui_Screensettings, 0xFFFFFF, 0xDFF4F5, LV_GRAD_DIR_VER);
 
     settings_item_count = 0U;
     ui_Image1 = NULL;
@@ -311,7 +313,7 @@ void ui_Screensettings_screen_init(void)
     lv_obj_set_size(back, 78, 34);
     lv_obj_align(back, LV_ALIGN_TOP_RIGHT, -12, 8);
     lv_obj_set_style_bg_color(back, lv_color_hex(UI_COLOR_BLUE_DARK), 0);
-    lv_obj_set_style_shadow_width(back, 0, 0);
+    ui_apply_raised_button(back);
     lv_obj_add_event_cb(back, ui_event_Screensettings, LV_EVENT_CLICKED, NULL);
     back_label = lv_label_create(back);
     lv_label_set_text(back_label, "Back");
@@ -320,6 +322,7 @@ void ui_Screensettings_screen_init(void)
     tv = lv_tabview_create(ui_Screensettings, LV_DIR_TOP, 34);
     lv_obj_set_size(tv, 980, 540);
     lv_obj_align(tv, LV_ALIGN_BOTTOM_MID, 0, -8);
+    ui_apply_raised_panel(tv);
 
     tab_gain = settings_make_tab(tv, "Gain");
     tab_remote = settings_make_tab(tv, "Remote");

@@ -265,6 +265,7 @@ static void compass_create(lv_obj_t *parent)
 	lv_obj_set_style_bg_opa(ring, LV_OPA_COVER, 0);
 	lv_obj_set_style_border_width(ring, 3, 0);
 	lv_obj_set_style_border_color(ring, lv_color_hex(UI_COLOR_CYAN), 0);
+	ui_apply_raised_panel(ring);
 	lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
 	lv_obj_align(ring, LV_ALIGN_TOP_LEFT, COMPASS_CX - COMPASS_RING_SIZE / 2, COMPASS_CY - COMPASS_RING_SIZE / 2);
 
@@ -387,7 +388,7 @@ static lv_obj_t *mode_dial_button_create(lv_obj_t *parent, int index, lv_coord_t
 	lv_obj_align(btn, LV_ALIGN_CENTER, x, y);
 	lv_obj_set_style_radius(btn, 19, 0);
 	lv_obj_set_style_border_width(btn, 2, 0);
-	lv_obj_set_style_shadow_width(btn, 0, 0);
+	ui_apply_raised_button(btn);
 	lv_obj_add_event_cb(btn, mode_dial_cb, LV_EVENT_CLICKED, &mode_dial_indices[index]);
 
 	label = lv_label_create(btn);
@@ -422,6 +423,7 @@ static void mode_dial_create(lv_obj_t *parent)
 	lv_obj_set_style_bg_opa(ring, LV_OPA_COVER, 0);
 	lv_obj_set_style_border_width(ring, 4, 0);
 	lv_obj_set_style_border_color(ring, lv_color_hex(UI_COLOR_CYAN), 0);
+	ui_apply_raised_panel(ring);
 	lv_obj_clear_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
 
 	mode_needle = lv_line_create(box);
@@ -445,6 +447,7 @@ static void mode_dial_create(lv_obj_t *parent)
 	lv_obj_set_style_bg_opa(center, LV_OPA_COVER, 0);
 	lv_obj_set_style_border_width(center, 2, 0);
 	lv_obj_set_style_border_color(center, lv_color_hex(UI_COLOR_CYAN), 0);
+	ui_apply_raised_panel(center);
 	lv_obj_clear_flag(center, LV_OBJ_FLAG_SCROLLABLE);
 
 	dl_mode = lv_label_create(center);
@@ -468,14 +471,16 @@ void ui_DataDetail_screen_init(void)
 	if (ui_DataDetail) return;
 
 	ui_DataDetail = lv_obj_create(NULL);
-	lv_obj_set_style_bg_color(ui_DataDetail, lv_color_hex(UI_COLOR_BG), 0);
+	ui_apply_gradient_background(ui_DataDetail, 0xF2FAFF, 0xD8F1F2, LV_GRAD_DIR_VER);
 
 	g_tv = lv_tabview_create(ui_DataDetail, LV_DIR_TOP, 30);
 	lv_obj_set_size(g_tv, 930, 560);
 	lv_obj_align(g_tv, LV_ALIGN_TOP_LEFT, 5, 5);
+	ui_apply_raised_panel(g_tv);
 
 	/* ---- Tab 0: GPS ---- */
 	lv_obj_t *t0 = lv_tabview_add_tab(g_tv, "GPS");
+	ui_apply_gradient_background(t0, 0xF3FFFA, 0xDCEFFF, LV_GRAD_DIR_VER);
 	dl_gps = lv_label_create(t0);
 	lv_label_set_text(dl_gps, "Lat: --\nLon: --\nSat: --");
 	lv_obj_set_style_text_color(dl_gps, lv_color_hex(UI_COLOR_CYAN_DARK), 0);
@@ -484,6 +489,7 @@ void ui_DataDetail_screen_init(void)
 
 	/* ---- Tab 1: Speed ---- */
 	lv_obj_t *t1 = lv_tabview_add_tab(g_tv, "Wheel");
+	ui_apply_gradient_background(t1, 0xFFF9ED, 0xE1F2F3, LV_GRAD_DIR_VER);
 	dl_speed = lv_label_create(t1);
 	lv_label_set_text(dl_speed, "Wheel encoder: --");
 	lv_obj_set_style_text_color(dl_speed, lv_color_hex(UI_COLOR_CYAN_DARK), 0);
@@ -492,6 +498,7 @@ void ui_DataDetail_screen_init(void)
 
 	/* ---- Tab 2: IMU ---- */
 	lv_obj_t *t2 = lv_tabview_add_tab(g_tv, "IMU");
+	ui_apply_gradient_background(t2, 0xF1FAFF, 0xD8EEF0, LV_GRAD_DIR_VER);
 	lv_obj_clear_flag(t2, LV_OBJ_FLAG_SCROLLABLE);
 	detail_update_data();
 	compass_create(t2);
@@ -504,6 +511,7 @@ void ui_DataDetail_screen_init(void)
 
 	/* ---- Tab 3: Mode switcher ---- */
 	lv_obj_t *t3 = lv_tabview_add_tab(g_tv, "Mode");
+	ui_apply_gradient_background(t3, 0xF7FAFC, 0xDFF4F5, LV_GRAD_DIR_VER);
 	mode_dial_create(t3);
 
 	/* Back button --- right edge, vertically centered */
@@ -511,6 +519,7 @@ void ui_DataDetail_screen_init(void)
 	lv_obj_t *back = lv_btn_create(ui_DataDetail);
 	lv_obj_set_size(back, 70, 36);
 	lv_obj_align(back, LV_ALIGN_RIGHT_MID, -5, 0);
+	ui_apply_raised_button(back);
 	lv_obj_t *bl = lv_label_create(back);
 	lv_label_set_text(bl, "Back");
 	lv_obj_center(bl);

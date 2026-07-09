@@ -72,6 +72,10 @@ void _ui_textarea_move_cursor(lv_obj_t * target, int val)
 void scr_unloaded_delete_cb(lv_event_t * e);
 
 void _ui_opacity_set(lv_obj_t * target, int val);
+void ui_apply_gradient_background(lv_obj_t * target, uint32_t main_color, uint32_t grad_color, lv_grad_dir_t dir);
+void ui_apply_rich_background(lv_obj_t * target);
+void ui_apply_raised_panel(lv_obj_t * target);
+void ui_apply_raised_button(lv_obj_t * target);
 
 /** Describes an animation*/
 typedef struct _ui_anim_user_data_t {

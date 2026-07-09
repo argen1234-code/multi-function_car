@@ -207,6 +207,7 @@ static lv_obj_t *add_panel(lv_obj_t *parent, const char *icon, const char *title
 	lv_obj_set_style_bg_color(pnl, lv_color_hex(UI_COLOR_CARD), 0);
 	lv_obj_set_style_border_color(pnl, lv_color_hex(UI_COLOR_CYAN_SOFT), 0);
 	lv_obj_set_style_border_width(pnl, 2, 0);
+	ui_apply_raised_panel(pnl);
 	lv_obj_clear_flag(pnl, LV_OBJ_FLAG_SCROLLABLE);
 
 	lv_obj_t *ic = lv_label_create(pnl);
@@ -238,6 +239,7 @@ static void add_road_control(lv_obj_t *parent, lv_coord_t y)
 	lv_obj_set_style_radius(box, 12, 0);
 	lv_obj_set_style_bg_color(box, lv_color_hex(UI_COLOR_CYAN_SOFT), 0);
 	lv_obj_set_style_border_width(box, 0, 0);
+	ui_apply_raised_panel(box);
 	lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
 
 	lb_road = lv_label_create(box);
@@ -277,8 +279,7 @@ void ui_DataDisplay_screen_init(void)
 	if (ui_DataDisplay) return;
 
 	ui_DataDisplay = lv_obj_create(NULL);
-	lv_obj_set_style_bg_color(ui_DataDisplay, lv_color_hex(UI_COLOR_BG), 0);
-	lv_obj_set_style_bg_opa(ui_DataDisplay, 255, 0);
+	ui_apply_gradient_background(ui_DataDisplay, 0xF2FFFD, 0xD8ECFF, LV_GRAD_DIR_VER);
 
 	/* Title */
 	lv_obj_t *t = lv_label_create(ui_DataDisplay);
