@@ -6,8 +6,14 @@ extern I2C_HandleTypeDef hi2c1;
 CalibParams params;
 volatile uint8_t qmc5883_calibrating = 0U;
 volatile uint16_t qmc5883_calibration_remaining_s = 0U;
+static QMC5883_CalibrationStepCallback_t qmc5883_calibration_step_callback = 0;
 
 #define RAD_TO_DEG  (180.0 / 3.14159265358979323846)
+
+void QMC5883_SetCalibrationStepCallback(QMC5883_CalibrationStepCallback_t callback)
+{
+    qmc5883_calibration_step_callback = callback;
+}
 
 /**
  * Initialize the QMC5883 magnetometer.
@@ -72,6 +78,8 @@ void Magnetometer_Calibration(void)
     static int16_t max_z = -32768;
 
     int16_t temp_hx, temp_hy, temp_hz;
+    uint8_t control_step;
+    uint32_t elapsed_ms;
     
     /* Rotate in place or figure-8 to record full-range magnetic min/max */
     qmc5883_calibrating = 1U;
@@ -99,7 +107,15 @@ void Magnetometer_Calibration(void)
 #endif
         }
 
-        HAL_Delay(30); 
+        for (control_step = 0U; control_step < 3U; control_step++)
+        {
+            elapsed_ms = (uint32_t)i * 30U + (uint32_t)control_step * 10U;
+            if (qmc5883_calibration_step_callback != 0)
+            {
+                qmc5883_calibration_step_callback(elapsed_ms);
+            }
+            HAL_Delay(10);
+        }
     }
 
     /* Calibration done, LED off */

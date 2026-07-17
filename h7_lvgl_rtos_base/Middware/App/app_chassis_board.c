@@ -24,6 +24,13 @@
 #define JETSON_TIMEOUT_MS  500U
 #define GPS_ONLINE_TIMEOUT_MS  3000U
 
+/* ---- Power-on magnetometer calibration motion (ms / internal Wz units) ---- */
+#define MAG_CALIB_WZ                 50.0f
+#define MAG_CALIB_STILL_END_MS       2000U
+#define MAG_CALIB_CW_END_MS         14000U
+#define MAG_CALIB_PAUSE_END_MS      15000U
+#define MAG_CALIB_CCW_END_MS        27000U
+
 /* ---- Preset GPS cruise route ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
     {26.449634, 106.650672},
@@ -40,6 +47,7 @@ static volatile uint8_t chassis_init_done = 0U;
 static char chassis_init_status[64] = "Init pending";
 
 static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
+static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 
 /*
  * Store an initialization status string for external monitoring.
@@ -626,6 +634,45 @@ void chassis_control_loop(chassis_move_t *chassis)
 }
 
 /* ============================================================
+ *  Power-on QMC5883 calibration motion step (called every 10 ms).
+ *  Keeps the original magnetometer sampling/calculation unchanged while
+ *  using the existing encoder feedback, kinematics and motor speed PID.
+ * ============================================================ */
+static void chassis_mag_calibration_step(uint32_t elapsed_ms)
+{
+    uint8_t i;
+    uint32_t now;
+
+    now = HAL_GetTick();
+
+    for (i = 0U; i < 4U; i++)
+    {
+        chassis_move.motor[i].speed = Encoder_Rpm_Get(i);
+        chassis_move.motor[i].last_update_tick = now;
+    }
+
+    chassis_move.Vx_set = 0.0f;
+    chassis_move.Vy_set = 0.0f;
+    chassis_move.Wz_set = 0.0f;
+
+    if (elapsed_ms >= MAG_CALIB_STILL_END_MS && elapsed_ms < MAG_CALIB_CW_END_MS)
+    {
+        chassis_move.Wz_set = -MAG_CALIB_WZ;
+    }
+    else if (elapsed_ms >= MAG_CALIB_PAUSE_END_MS && elapsed_ms < MAG_CALIB_CCW_END_MS)
+    {
+        chassis_move.Wz_set = MAG_CALIB_WZ;
+    }
+
+    chassis_control_loop(&chassis_move);
+
+    for (i = 0U; i < 4U; i++)
+    {
+        Motor_SetPWM((int16_t)chassis_move.motor[i].speed_pid.Out, i);
+    }
+}
+
+/* ============================================================
  *  Step 1: Chassis control mode arbitration.
  *  Priority: GUI request > Bluetooth > Manual hold > Voice > Jetson -> auto fallback to IDLE.
  * ============================================================ */
@@ -970,7 +1017,12 @@ void chassis_task(void *pvParameters)
     /* -- One-time initialization -- */ 
     chassis_init(&chassis_move);
     chassis_set_init_status("Init QMC5883");
+	QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
 	QMC5883_Init();
+	QMC5883_SetCalibrationStepCallback(NULL);
+	Motor_SetAllPWM(0, 0, 0, 0);
+	chassis_stop(&chassis_move);
+	chassis_clear_motor_output(&chassis_move);
     chassis_set_init_status("Init GPS");
 	GPS_Init();
     chassis_set_init_status("Modules Ready");

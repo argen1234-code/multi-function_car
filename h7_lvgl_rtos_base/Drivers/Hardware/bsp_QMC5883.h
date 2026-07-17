@@ -7,6 +7,8 @@
 /* I2C 7-bit addr = 0x0D. HAL requires left-shift (8-bit addr), hence 0x1A */
 #define QMC5883_ADDR 0x1A
 
+typedef void (*QMC5883_CalibrationStepCallback_t)(uint32_t elapsed_ms);
+
 typedef struct {
     float yaw;      /* Yaw angle (0~360 deg) */
     float pitch;    /* Pitch angle (-180~180 deg) */
@@ -21,6 +23,9 @@ typedef struct {
 
 /* Initialize QMC5883: configure registers and run 30-second calibration. */
 void QMC5883_Init(void);
+
+/* Register an optional 10 ms step callback used during the 30-second calibration. */
+void QMC5883_SetCalibrationStepCallback(QMC5883_CalibrationStepCallback_t callback);
 
 /* Read raw 16-bit ADC counts for X/Y/Z axes via I2C. */
 void QMC5883_ReadRawData(int16_t *x, int16_t *y, int16_t *z);
