@@ -68,6 +68,32 @@ typedef struct {
     JY901S_Data_t jy901s;           /* JY901S 9-axis sensor data */
 } IMU_Data_t;
 
+/*
+ * Keil 调试专用的 JY901S 全量快照。
+ *
+ * chassis_move 是 app_chassis_board.c 内部的 static 私有对象，Keil 在非该文件的
+ * 断点处无法稳定解析 chassis_move.imu.jy901s。故额外提供这个具名、全局、volatile
+ * 结构体，便于在任意断点的 Watch 中直接添加 g_chassis_jy901s_debug 并展开查看。
+ *
+ * 它仅在收到一帧新的 JY901S 数据后复制该帧内容；不作为控制输入，也绝不写回
+ * chassis_move、PID、底盘模式或电机控制量。
+ */
+typedef struct ChassisJY901SDebug_s
+{
+    uint32_t update_sequence; /* 偶数：完整快照；奇数：调试器刚好停在复制过程中。 */
+    float acc[3];             /* X/Y/Z 加速度，单位 g。 */
+    float gyro[3];            /* X/Y/Z 角速度，单位 deg/s。 */
+    float angle[3];           /* roll/pitch/yaw，单位 deg。 */
+    int16_t mag[3];           /* X/Y/Z 原始磁场数据。 */
+    float temperature;        /* 温度，单位摄氏度。 */
+    uint32_t update_flag;     /* 本帧有效数据位：ACC/GYRO/ANGLE/MAG/TEMP。 */
+    uint32_t last_update_tick;/* JY901S 收到该帧时的 HAL tick，单位 ms。 */
+    uint8_t online;           /* 1：JY901S 在线；0：离线或尚未收到有效数据。 */
+} ChassisJY901SDebug_t;
+
+/* 可直接加入 Keil Watch 的 JY901S 调试变量。业务代码仅允许读取，禁止写入。 */
+extern volatile ChassisJY901SDebug_t g_chassis_jy901s_debug;
+
 /* ============================================================
  *  Chassis motor + speed PID
  * ============================================================ */

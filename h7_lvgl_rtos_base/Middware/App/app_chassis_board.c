@@ -12,6 +12,7 @@
 #include "bsp_GPS.h"
 #include "bsp_bluetooth.h"
 #include "bsp_JY901S.h"
+#include "bsp_road_classification.h"
 #include "bsp_WonderEcho.h"
 #include "usart.h"
 #include <math.h>
@@ -46,8 +47,46 @@ static uint8_t chassis_manual_indoor_mode = 0U;
 static volatile uint8_t chassis_init_done = 0U;
 static char chassis_init_status[64] = "Init pending";
 
+/*
+ * 全局可见的 JY901S 调试镜像。volatile 用于保证即使打开优化，Keil Watch 读取的
+ * 也是 RAM 中真实更新的内容。该镜像不被任何控制流程读取。
+ */
+volatile ChassisJY901SDebug_t g_chassis_jy901s_debug;
+
 static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
 static void chassis_mag_calibration_step(uint32_t elapsed_ms);
+
+/*
+ * 复制刚收到的 JY901S 完整数据帧，仅服务于在线调试。
+ * update_sequence 前后各加一次，使 Watch 在实时刷新时可确认读取到的是完整快照。
+ * 此函数不修改 source，不调用任何 PID/电机/模式函数，也不改动 chassis_move。
+ */
+static void chassis_update_jy901s_debug_snapshot(const JY901S_Data_t *source)
+{
+    uint8_t i;
+
+    if (source == NULL)
+    {
+        return;
+    }
+
+    g_chassis_jy901s_debug.update_sequence++;
+
+    for (i = 0U; i < 3U; i++)
+    {
+        g_chassis_jy901s_debug.acc[i] = source->acc[i];
+        g_chassis_jy901s_debug.gyro[i] = source->gyro[i];
+        g_chassis_jy901s_debug.angle[i] = source->angle[i];
+        g_chassis_jy901s_debug.mag[i] = source->mag[i];
+    }
+
+    g_chassis_jy901s_debug.temperature = source->temperature;
+    g_chassis_jy901s_debug.update_flag = source->update_flag;
+    g_chassis_jy901s_debug.last_update_tick = source->last_update_tick;
+    g_chassis_jy901s_debug.online = source->online;
+
+    g_chassis_jy901s_debug.update_sequence++;
+}
 
 /*
  * Store an initialization status string for external monitoring.
@@ -478,6 +517,11 @@ void chassis_feedback_update(chassis_move_t *chassis)
         if (JY901S_GetData(&jy901s_data))
         {
             chassis->imu.jy901s = jy901s_data;
+            /*
+             * 将“已经被底盘采用”的同一帧复制到全局调试镜像，便于 Keil 观察。
+             * 这行只增加 RAM 镜像，不会影响后续姿态、运动学、PID 或电机输出。
+             */
+            chassis_update_jy901s_debug_snapshot(&jy901s_data);
             chassis->imu.ins.euler.roll = jy901s_data.angle[0];
             chassis->imu.ins.euler.pitch = jy901s_data.angle[1];
             chassis->imu.ins.euler.yaw = jy901s_data.angle[2];
@@ -558,6 +602,13 @@ static void chassis_init(chassis_move_t *chassis)
     uart_init(&huart2, UART_DMA_ToIdle_RX);
     chassis_set_init_status("Init JY901S");
     JY901S_Init();
+
+    /*
+     * 路面识别只维护自己的 NanoEdge 缓冲和结果快照。即使模型初始化失败，
+     * 底盘初始化与后续控制仍按原有路径继续，绝不因此改变 PID 或电机输出。
+     */
+    chassis_set_init_status("Init Road AI");
+    (void)BSP_RoadClassification_Init();
 
     /* Remote control parameter defaults */
     chassis->remote.bt_speed         = BT_REMOTE_SPEED;
@@ -1033,6 +1084,13 @@ void chassis_task(void *pvParameters)
     while (1)
     {
         chassis_feedback_update(&chassis_move);   /* Sensors + USB data refresh */
+
+        /*
+         * 复用现有 10 ms 底盘任务，不创建新任务。BSP 内部会自动忽略重复的
+         * JY901S 帧，仅在收集满 32 个新 IMU 帧后推理；它不写入 chassis_move。
+         */
+        BSP_RoadClassification_Process(&chassis_move.imu.jy901s);
+
         if (HAL_GetTick() - voice_tick >= 50U)
         {
             voice_tick = HAL_GetTick();
