@@ -1086,7 +1086,6 @@ void chassis_task(void *pvParameters)
 //chassis_move.Wz_set = 0.0f;           /* 不旋转 */
     /* -- Default mode; chassis_mode_change auto-arbitrates based on availability -- */
     /* -- Main loop (100Hz) -- */
-	
     while (1)
     {
         chassis_feedback_update(&chassis_move);   /* Sensors + USB data refresh */
