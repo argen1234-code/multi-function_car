@@ -1068,9 +1068,9 @@ void chassis_task(void *pvParameters)
     /* -- One-time initialization -- */ 
     chassis_init(&chassis_move);
     chassis_set_init_status("Init QMC5883");
-	QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
-	QMC5883_Init();
-	QMC5883_SetCalibrationStepCallback(NULL);
+	//QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
+	//QMC5883_Init();
+	//QMC5883_SetCalibrationStepCallback(NULL);
 	Motor_SetAllPWM(0, 0, 0, 0);
 	chassis_stop(&chassis_move);
 	chassis_clear_motor_output(&chassis_move);
@@ -1079,8 +1079,14 @@ void chassis_task(void *pvParameters)
     chassis_set_init_status("Modules Ready");
     chassis_init_done = 1U;
 
+//		/* 路面识别直行测试：仅本次测试使用 */
+//chassis_move.mode = CAR_MODE_INDOOR;  /* 只用于避开 IDLE 的强制停车；不执行蓝牙控制 */
+//chassis_move.Vx_set = 100.0f;          /* 先从 30 开始测试 */
+//chassis_move.Vy_set = 0.0f;           /* 不横移 */
+//chassis_move.Wz_set = 0.0f;           /* 不旋转 */
     /* -- Default mode; chassis_mode_change auto-arbitrates based on availability -- */
     /* -- Main loop (100Hz) -- */
+	
     while (1)
     {
         chassis_feedback_update(&chassis_move);   /* Sensors + USB data refresh */

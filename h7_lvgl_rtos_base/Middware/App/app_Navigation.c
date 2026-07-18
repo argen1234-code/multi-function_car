@@ -7,8 +7,8 @@
 
 /* ---- 距离PID参数 ---- */
 static float Kp_dist  = 8.0f;     /* 米距 → 速度 单位转化比例 */
-static float Max_speed = 50.0f;   /* 最大平移速度限制 */
-static float Min_speed = 40.0f;   /* 克服底盘低速死区的最小平移速度 */
+static float Max_speed = 100.0f;   /* 最大平移速度限制 */
+static float Min_speed = 60.0f;   /* 克服底盘低速死区的最小平移速度 */
 
 /* ---- 航向偏角PID参数 ---- */
 static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */

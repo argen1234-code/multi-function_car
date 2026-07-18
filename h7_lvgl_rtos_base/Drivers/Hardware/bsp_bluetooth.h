@@ -28,6 +28,56 @@ typedef enum {
     BT_MODE_REQ_INDOOR
 } BT_ModeReq_t;
 
+/*
+ * Keil Watch debug mirror for the Bluetooth receive path.
+ *
+ * g_bt_debug is written only for observation; the vehicle control path never
+ * reads it. raw_data contains the most recent UART RX event exactly as passed
+ * to BT_ProcessRxData(), while last_payload contains the most recent complete
+ * frame payload (without '@' and CR/LF).
+ */
+#define BT_DEBUG_RAW_MAX_LEN      512U
+#define BT_DEBUG_PAYLOAD_MAX_LEN   64U
+
+typedef struct
+{
+    uint32_t update_sequence;       /* Changes around each mirror update. */
+
+    uint32_t rx_event_count;        /* UART RX-to-idle callback count. */
+    uint32_t rx_byte_count;         /* Total bytes observed by BT parser. */
+    uint32_t complete_frame_count;  /* Complete @payload\r\n frames. */
+    uint32_t accepted_token_count;  /* Frames/tokens that queued an ACK. */
+    uint32_t ack_queued_count;      /* Number of ACKs queued successfully. */
+    uint32_t frame_overflow_count;  /* Payloads exceeding parser capacity. */
+    uint32_t format_error_count;    /* CR not followed by LF. */
+
+    uint32_t last_rx_event_tick;    /* HAL tick of the latest DMA event. */
+    uint32_t last_valid_frame_tick; /* HAL tick of the latest complete frame. */
+    uint16_t last_rx_size;          /* Byte count reported by the UART callback. */
+    uint16_t last_rx_copied_len;    /* Bytes copied into raw_data. */
+    uint8_t  raw_data[BT_DEBUG_RAW_MAX_LEN];
+
+    uint8_t  frame_active;          /* Parser has seen '@'. */
+    uint8_t  frame_saw_cr;          /* Parser is waiting for LF. */
+    uint8_t  frame_len;             /* Current partial payload length. */
+    uint8_t  reserved0;
+    char     last_payload[BT_DEBUG_PAYLOAD_MAX_LEN];
+    uint8_t  last_payload_len;
+
+    uint8_t      cmd;               /* Current command character, e.g. 'F'. */
+    uint8_t      key_state;         /* BT_KEY_* bit mask. */
+    uint8_t      active;            /* Same meaning as BT_IsActive(). */
+    uint8_t      online;            /* Same meaning as the latest BT_IsOnline(). */
+    BT_Motion_t  motion;            /* Decoded motion. */
+    BT_ModeReq_t pending_mode_req;  /* Request not yet consumed by chassis task. */
+    BT_ModeReq_t last_mode_req;     /* Last non-NONE request, retained for Watch. */
+    uint8_t      ack_pending;       /* ACK count awaiting chassis transmission. */
+    uint8_t      last_ack_count;    /* ACK count last consumed by chassis task. */
+} BT_Debug_t;
+
+/* Add this single symbol to Keil Watch and expand it. Read-only for users. */
+extern volatile BT_Debug_t g_bt_debug;
+
 void           BT_Init(void);
 void           BT_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 BT_Motion_t    BT_GetMotion(void);

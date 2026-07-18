@@ -5,6 +5,8 @@
 #define BT_FRAME_MAX_LEN      64U
 #define BT_ONLINE_TIMEOUT_MS  3000U
 
+volatile BT_Debug_t g_bt_debug;
+
 static volatile uint8_t      bt_cmd       = 'S';
 static volatile uint8_t      bt_key_state = 0U;
 static volatile BT_ModeReq_t bt_mode_req  = BT_MODE_REQ_NONE;
@@ -14,6 +16,136 @@ static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
 static uint8_t               bt_frame_active = 0U;
 static uint8_t               bt_frame_saw_cr = 0U;
+
+static BT_Motion_t bt_debug_motion_from_state(void)
+{
+    uint8_t cmd = bt_cmd;
+
+    if (bt_key_state == 0U)
+    {
+        cmd = 'S';
+    }
+
+    switch (cmd)
+    {
+        case 'F': case 'f': return BT_MOTION_FORWARD;
+        case 'B': case 'b': return BT_MOTION_BACKWARD;
+        case 'L': case 'l': return BT_MOTION_LEFT;
+        case 'R': case 'r': return BT_MOTION_RIGHT;
+        case 'Q': case 'q': return BT_MOTION_ROTATE_LEFT;
+        case 'E': case 'e': return BT_MOTION_ROTATE_RIGHT;
+        default:            return BT_MOTION_STOP;
+    }
+}
+
+static void bt_debug_reset(void)
+{
+    uint16_t i;
+
+    g_bt_debug.update_sequence = 0U;
+    g_bt_debug.rx_event_count = 0U;
+    g_bt_debug.rx_byte_count = 0U;
+    g_bt_debug.complete_frame_count = 0U;
+    g_bt_debug.accepted_token_count = 0U;
+    g_bt_debug.ack_queued_count = 0U;
+    g_bt_debug.frame_overflow_count = 0U;
+    g_bt_debug.format_error_count = 0U;
+    g_bt_debug.last_rx_event_tick = 0U;
+    g_bt_debug.last_valid_frame_tick = 0U;
+    g_bt_debug.last_rx_size = 0U;
+    g_bt_debug.last_rx_copied_len = 0U;
+    g_bt_debug.frame_active = 0U;
+    g_bt_debug.frame_saw_cr = 0U;
+    g_bt_debug.frame_len = 0U;
+    g_bt_debug.reserved0 = 0U;
+    g_bt_debug.last_payload_len = 0U;
+    g_bt_debug.cmd = 'S';
+    g_bt_debug.key_state = 0U;
+    g_bt_debug.active = 0U;
+    g_bt_debug.online = 0U;
+    g_bt_debug.motion = BT_MOTION_STOP;
+    g_bt_debug.pending_mode_req = BT_MODE_REQ_NONE;
+    g_bt_debug.last_mode_req = BT_MODE_REQ_NONE;
+    g_bt_debug.ack_pending = 0U;
+    g_bt_debug.last_ack_count = 0U;
+
+    for (i = 0U; i < BT_DEBUG_RAW_MAX_LEN; i++)
+    {
+        g_bt_debug.raw_data[i] = 0U;
+    }
+
+    for (i = 0U; i < BT_DEBUG_PAYLOAD_MAX_LEN; i++)
+    {
+        g_bt_debug.last_payload[i] = '\0';
+    }
+}
+
+static void bt_debug_sync_state(void)
+{
+    uint32_t now = HAL_GetTick();
+    uint8_t active = (bt_key_state != 0U) ? 1U : 0U;
+
+    g_bt_debug.update_sequence++;
+    g_bt_debug.frame_active = bt_frame_active;
+    g_bt_debug.frame_saw_cr = bt_frame_saw_cr;
+    g_bt_debug.frame_len = bt_frame_len;
+    g_bt_debug.cmd = bt_cmd;
+    g_bt_debug.key_state = bt_key_state;
+    g_bt_debug.active = active;
+    g_bt_debug.online = (active ||
+                         (bt_last_rx_tick != 0U &&
+                          (now - bt_last_rx_tick) <= BT_ONLINE_TIMEOUT_MS)) ? 1U : 0U;
+    g_bt_debug.motion = bt_debug_motion_from_state();
+    g_bt_debug.pending_mode_req = bt_mode_req;
+    if (bt_mode_req != BT_MODE_REQ_NONE)
+    {
+        g_bt_debug.last_mode_req = bt_mode_req;
+    }
+    g_bt_debug.ack_pending = bt_ack_count;
+    g_bt_debug.update_sequence++;
+}
+
+static void bt_debug_capture_rx(const uint8_t *pBuf, uint16_t Size)
+{
+    uint16_t i;
+    uint16_t copy_len = Size;
+
+    if (copy_len > BT_DEBUG_RAW_MAX_LEN)
+    {
+        copy_len = BT_DEBUG_RAW_MAX_LEN;
+    }
+
+    g_bt_debug.update_sequence++;
+    g_bt_debug.rx_event_count++;
+    g_bt_debug.rx_byte_count += Size;
+    g_bt_debug.last_rx_event_tick = HAL_GetTick();
+    g_bt_debug.last_rx_size = Size;
+    g_bt_debug.last_rx_copied_len = copy_len;
+
+    for (i = 0U; i < copy_len; i++)
+    {
+        g_bt_debug.raw_data[i] = pBuf[i];
+    }
+
+    g_bt_debug.update_sequence++;
+}
+
+static void bt_debug_capture_complete_frame(void)
+{
+    uint8_t i;
+
+    g_bt_debug.update_sequence++;
+    g_bt_debug.complete_frame_count++;
+    g_bt_debug.last_valid_frame_tick = bt_last_rx_tick;
+    g_bt_debug.last_payload_len = bt_frame_len;
+
+    for (i = 0U; i < bt_frame_len; i++)
+    {
+        g_bt_debug.last_payload[i] = bt_frame_buf[i];
+    }
+    g_bt_debug.last_payload[bt_frame_len] = '\0';
+    g_bt_debug.update_sequence++;
+}
 
 static char bt_to_lower(char c)
 {
@@ -40,9 +172,12 @@ static void bt_clear_motion(void)
 
 static void bt_queue_ack(void)
 {
+    g_bt_debug.accepted_token_count++;
+
     if (bt_ack_count < 255U)
     {
         bt_ack_count++;
+        g_bt_debug.ack_queued_count++;
     }
 }
 
@@ -275,6 +410,8 @@ void BT_Init(void)
     bt_ack_count = 0U;
     bt_last_rx_tick = 0U;
     bt_frame_reset();
+    bt_debug_reset();
+    bt_debug_sync_state();
 }
 
 /* Called from UART ISR / DMA callback to feed received data */
@@ -284,6 +421,8 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
     {
         return;
     }
+
+    bt_debug_capture_rx(pBuf, Size);
 
     for (uint16_t i = 0; i < Size; i++)
     {
@@ -314,6 +453,7 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
             {
                 bt_frame_buf[bt_frame_len] = '\0';
                 bt_last_rx_tick = HAL_GetTick();
+                bt_debug_capture_complete_frame();
                 bt_process_payload(bt_frame_buf);
                 bt_frame_reset();
             }
@@ -325,6 +465,7 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
             }
             else
             {
+                g_bt_debug.format_error_count++;
                 bt_frame_reset();
             }
             continue;
@@ -342,31 +483,44 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
         }
         else
         {
+            g_bt_debug.frame_overflow_count++;
             bt_frame_reset();
         }
     }
+
+    bt_debug_sync_state();
 }
 
 /* Returns 1 if BT remote is actively sending motion commands */
 uint8_t BT_IsActive(void)
 {
-    return (bt_key_state != 0U) ? 1U : 0U;
+    uint8_t active = (bt_key_state != 0U) ? 1U : 0U;
+
+    g_bt_debug.active = active;
+    return active;
 }
 
 uint8_t BT_IsOnline(void)
 {
     uint32_t tick = bt_last_rx_tick;
+    uint8_t online;
 
     if (BT_IsActive())
     {
-        return 1U;
+        online = 1U;
+    }
+    else
+    {
+        online = (tick != 0U && (HAL_GetTick() - tick) <= BT_ONLINE_TIMEOUT_MS) ? 1U : 0U;
     }
 
-    return (tick != 0U && (HAL_GetTick() - tick) <= BT_ONLINE_TIMEOUT_MS) ? 1U : 0U;
+    g_bt_debug.online = online;
+    return online;
 }
 
 uint8_t BT_GetKeyState(void)
 {
+    g_bt_debug.key_state = bt_key_state;
     return bt_key_state;
 }
 
@@ -374,6 +528,7 @@ uint8_t BT_GetKeyState(void)
 BT_Motion_t BT_GetMotion(void)
 {
     uint8_t cmd = bt_cmd;
+    BT_Motion_t motion;
 
     if (!BT_IsActive())
     {
@@ -382,14 +537,17 @@ BT_Motion_t BT_GetMotion(void)
 
     switch (cmd)
     {
-        case 'F': case 'f': return BT_MOTION_FORWARD;
-        case 'B': case 'b': return BT_MOTION_BACKWARD;
-        case 'L': case 'l': return BT_MOTION_LEFT;
-        case 'R': case 'r': return BT_MOTION_RIGHT;
-        case 'Q': case 'q': return BT_MOTION_ROTATE_LEFT;
-        case 'E': case 'e': return BT_MOTION_ROTATE_RIGHT;
-        default:            return BT_MOTION_STOP;
+        case 'F': case 'f': motion = BT_MOTION_FORWARD; break;
+        case 'B': case 'b': motion = BT_MOTION_BACKWARD; break;
+        case 'L': case 'l': motion = BT_MOTION_LEFT; break;
+        case 'R': case 'r': motion = BT_MOTION_RIGHT; break;
+        case 'Q': case 'q': motion = BT_MOTION_ROTATE_LEFT; break;
+        case 'E': case 'e': motion = BT_MOTION_ROTATE_RIGHT; break;
+        default:            motion = BT_MOTION_STOP; break;
     }
+
+    g_bt_debug.motion = motion;
+    return motion;
 }
 
 /* Returns and clears the pending mode request from BT */
@@ -397,6 +555,11 @@ BT_ModeReq_t BT_GetAndClearModeReq(void)
 {
     BT_ModeReq_t req = bt_mode_req;
     bt_mode_req = BT_MODE_REQ_NONE;
+    if (req != BT_MODE_REQ_NONE)
+    {
+        g_bt_debug.last_mode_req = req;
+    }
+    bt_debug_sync_state();
     return req;
 }
 
@@ -409,5 +572,7 @@ uint8_t BT_GetAndClearAckCount(void)
     bt_ack_count = 0U;
     __enable_irq();
 
+    g_bt_debug.last_ack_count = count;
+    bt_debug_sync_state();
     return count;
 }

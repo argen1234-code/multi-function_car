@@ -8,7 +8,7 @@ typedef struct chassis_move_s chassis_move_t;
 
 /* ---- 蓝牙遥控默认参数 ---- */
 #define BT_REMOTE_SPEED       80.0f
-#define BT_REMOTE_WZ          20.0f
+#define BT_REMOTE_WZ          80.0f
 
 /* ---- 微信遥控默认参数 ---- */
 #define WECHAT_VX_SCALE       100.0f
