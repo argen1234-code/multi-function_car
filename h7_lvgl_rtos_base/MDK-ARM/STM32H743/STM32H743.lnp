@@ -246,6 +246,8 @@
 "stm32h743\bsp_bluetooth.o"
 "stm32h743\bsp_usb.o"
 "stm32h743\bsp_jy901s.o"
+"stm32h743\bsp_road_classification.o"
+"..\Drivers\Hardware\NanoEdgeAI\libneai.a"
 "stm32h743\bsp_wit_c_sdk.o"
 "stm32h743\bsp_wonderecho.o"
 "stm32h743\bsp_tf_card.o"
@@ -282,7 +284,7 @@
 "stm32h743\ui_font_font4.o"
 "stm32h743\ui_font_font5.o"
 "stm32h743\ff.o"
---library_type=microlib --strict --scatter "STM32H743\STM32H743.sct"
---summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--library_type=microlib --diag_suppress 6436 --strict --scatter "STM32H743\STM32H743.sct"
+--no_strict_wchar_size --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
 --list "STM32H743.map" -o STM32H743\STM32H743.axf

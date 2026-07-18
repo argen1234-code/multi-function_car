@@ -51,3 +51,4 @@ stm32h743\bsp_bluetooth.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd
 stm32h743\bsp_bluetooth.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
 stm32h743\bsp_bluetooth.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
 stm32h743\bsp_bluetooth.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
+stm32h743\bsp_bluetooth.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h

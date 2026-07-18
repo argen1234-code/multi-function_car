@@ -1,6 +1,5 @@
 stm32h743\app_remote_control.o: ..\Middware\App\app_remote_control.c
 stm32h743\app_remote_control.o: ..\Middware\App\app_remote_control.h
-stm32h743\app_remote_control.o: ..\Middware\App\app_chassis_board.h
 stm32h743\app_remote_control.o: ../Core/Inc/main.h
 stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h
 stm32h743\app_remote_control.o: ../Core/Inc/stm32h7xx_hal_conf.h
@@ -52,6 +51,7 @@ stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ha
 stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h
 stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h
 stm32h743\app_remote_control.o: ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_hcd.h
+stm32h743\app_remote_control.o: ..\Middware\App\app_chassis_board.h
 stm32h743\app_remote_control.o: ..\Drivers\Algorithm\pid.h
 stm32h743\app_remote_control.o: ..\Drivers\Hardware\bsp_QMC5883.h
 stm32h743\app_remote_control.o: ..\Drivers\Hardware\bsp_usb.h

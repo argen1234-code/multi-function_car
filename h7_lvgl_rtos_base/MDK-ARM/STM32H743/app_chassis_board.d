@@ -85,5 +85,6 @@ stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_encoder.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_motor.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_GPS.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_bluetooth.h
+stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_road_classification.h
 stm32h743\app_chassis_board.o: ..\Drivers\Hardware\bsp_WonderEcho.h
 stm32h743\app_chassis_board.o: ../Drivers/User/Inc/usart.h

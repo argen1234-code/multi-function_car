@@ -195,4 +195,5 @@ stm32h743\ui_datadetail.o: ..\Drivers\Hardware\bsp_QMC5883.h
 stm32h743\ui_datadetail.o: ..\Drivers\Hardware\bsp_usb.h
 stm32h743\ui_datadetail.o: ..\Middware\App\app_Navigation.h
 stm32h743\ui_datadetail.o: ..\Drivers\Hardware\bsp_JY901S.h
+stm32h743\ui_datadetail.o: ..\Middware\App\app_remote_control.h
 stm32h743\ui_datadetail.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h

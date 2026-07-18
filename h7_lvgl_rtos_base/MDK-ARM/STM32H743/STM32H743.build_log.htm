@@ -5,7 +5,7 @@
 <h2>Tool Versions:</h2>
 IDE-Version: ¦ÌVision V5.39.0.0
 Copyright (C) 2023 ARM Ltd and ARM Germany GmbH. All rights reserved.
-License Information: Argen Argen, Argen, LIC=PE7DL-0PD88-IIZ5V-P1CXJ-1IVFB-6C5E1
+License Information: 1 han_zhen_hao@163.com, 1, LIC=14HV2-9V8DQ-VE7HA-1DC1B-JNC0M-JVA91
  
 Tool Versions:
 Toolchain:       MDK-ARM Plus  Version: 5.39.0.0
@@ -21,41 +21,52 @@ Target DLL:      CMSIS_AGDI.dll V1.33.16.0
 Dialog DLL:      TCM.DLL V1.56.4.0
  
 <h2>Project:</h2>
-C:\00_git_code\gps_car\multi-function_car\h7_lvgl_rtos_base\MDK-ARM\STM32H743.uvprojx
-Project File Date:  06/22/2026
+D:\¾ºÈü\2026Ç¶Èü\multi-function_car\h7_lvgl_rtos_base\MDK-ARM\STM32H743.uvprojx
+Project File Date:  07/17/2026
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 7 (build 960)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
 Build target 'STM32H743'
-compiling ui_DataDisplay.c...
+compiling app_Navigation.c...
+compiling app_remote_control.c...
+compiling app_Voice_Recognition.c...
+compiling app_chassis_board.c...
+..\Middware\App\app_chassis_board.c(692): warning:  #177-D: function "chassis_mag_calibration_step"  was declared but never referenced
+  static void chassis_mag_calibration_step(uint32_t elapsed_ms)
+..\Middware\App\app_chassis_board.c: 1 warning, 0 errors
 compiling ui_DataDetail.c...
+compiling ui_Screenmain.c...
+compiling ui_Screensettings.c...
+compiling ui_DataDisplay.c...
+compiling freertos.c...
 linking...
-Program Size: Code=310940 RO-data=111844 RW-data=1792 ZI-data=83232  
+Program Size: Code=328104 RO-data=140408 RW-data=1920 ZI-data=86280  
 FromELF: creating hex file...
-"STM32H743\STM32H743.axf" - 0 Error(s), 0 Warning(s).
+"STM32H743\STM32H743.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
 Package Vendor: ARM
-                https://www.keil.com/pack/ARM.CMSIS.6.1.0.pack
-                ARM::CMSIS@6.1.0
+                http://www.keil.com/pack/ARM.CMSIS.5.9.0.pack
+                ARM::CMSIS@5.9.0
                 CMSIS (Common Microcontroller Software Interface Standard)
-   * Component: CORE Version: 6.1.0
+   * Component: CORE Version: 5.6.0
 
 Package Vendor: Keil
-                https://www.keil.com/pack/Keil.STM32H7xx_DFP.4.1.2.pack
-                Keil::STM32H7xx_DFP@4.1.2
-                STMicroelectronics STM32H7 Series Device Support
+                http://www.keil.com/pack/Keil.STM32H7xx_DFP.2.7.0.pack
+                Keil::STM32H7xx_DFP@2.7.0
+                STMicroelectronics STM32H7 Series Device Support and Examples
 
 <h2>Collection of Component include folders:</h2>
   ./RTE/_STM32H743
-  C:/Users/Arjen/AppData/Local/Arm/Packs/ARM/CMSIS/6.1.0/CMSIS/Core/Include
+  C:/Users/han_z/AppData/Local/Arm/Packs/ARM/CMSIS/5.9.0/CMSIS/Core/Include
+  C:/Users/han_z/AppData/Local/Arm/Packs/Keil/STM32H7xx_DFP/2.7.0/Drivers/CMSIS/Device/ST/STM32H7xx/Include
 
 <h2>Collection of Component Files used:</h2>
 
-   * Component: ARM::CMSIS:CORE@6.1.0
+   * Component: ARM::CMSIS:CORE@5.6.0
       Include file:  CMSIS/Core/Include/tz_context.h
-Build Time Elapsed:  00:00:08
+Build Time Elapsed:  00:00:19
 </pre>
 </body>
 </html>
