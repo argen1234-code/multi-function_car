@@ -66,7 +66,7 @@ void ui_Login_screen_init(void)
 	lv_obj_set_style_bg_color(ui_Login, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN);
 	lv_obj_set_style_bg_opa(ui_Login, 255, LV_PART_MAIN);
 
-#if LVGL_UI_ENABLE_ALL_BACKGROUND || LVGL_UI_ENABLE_LOGIN_IMAGE_BACKGROUND
+#if LVGL_UI_ENABLE_LOGIN_IMAGE_BACKGROUND
 	lv_obj_t *bg = lv_img_create(ui_Login);
 	lv_img_set_src(bg, &ui_img_1943878613);
 	lv_obj_set_size(bg, 1024, 600);

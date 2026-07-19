@@ -34,7 +34,7 @@
 //#define MOTOR_SPEED_PID_KP       1.22f
 //#define MOTOR_SPEED_PID_KI       0.09f
 //#define MOTOR_SPEED_PID_KD       0.08f
-#define MOTOR_SPEED_PID_MAX_OUT  120.0f
+#define MOTOR_SPEED_PID_MAX_OUT  150.0f
 #define MOTOR_SPEED_PID_MAX_IOUT 40.0f
 
 /* ============================================================

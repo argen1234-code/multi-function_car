@@ -7,8 +7,8 @@
 typedef struct chassis_move_s chassis_move_t;
 
 /* ---- 蓝牙遥控默认参数 ---- */
-#define BT_REMOTE_SPEED       80.0f
-#define BT_REMOTE_WZ          80.0f
+#define BT_REMOTE_SPEED       130.0f
+#define BT_REMOTE_WZ          130.0f
 
 /* ---- 微信遥控默认参数 ---- */
 #define WECHAT_VX_SCALE       100.0f
@@ -18,9 +18,9 @@ typedef struct chassis_move_s chassis_move_t;
 #define WECHAT_MAX_WZ         37.5f
 
 /* ---- ROS 室内导航默认参数 ---- */
-#define ROS_LINE_VX_SCALE     100.0f
-#define ROS_LINE_VZ_SCALE     30.0f
-#define ROS_LINE_MAX_SPEED    50.0f
+#define ROS_LINE_VX_SCALE     120.0f
+#define ROS_LINE_VZ_SCALE     40.0f
+#define ROS_LINE_MAX_SPEED    120.0f
 #define ROS_LINE_MAX_WZ       25.0f
 
 /* ============================================================

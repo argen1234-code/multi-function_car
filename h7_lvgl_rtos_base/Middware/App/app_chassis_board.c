@@ -702,7 +702,7 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms)
         chassis_move.motor[i].last_update_tick = now;
     }
 
-    chassis_move.Vx_set = 0.0f;
+    chassis_move.Vx_set = 0.0f; 
     chassis_move.Vy_set = 0.0f;
     chassis_move.Wz_set = 0.0f;
 
@@ -1091,8 +1091,9 @@ void chassis_task(void *pvParameters)
         chassis_feedback_update(&chassis_move);   /* Sensors + USB data refresh */
 
         /*
-         * 复用现有 10 ms 底盘任务，不创建新任务。BSP 内部会自动忽略重复的
-         * JY901S 帧，仅在收集满 32 个新 IMU 帧后推理；它不写入 chassis_move。
+         * 复用现有 10 ms 底盘任务，不创建新任务。BSP 只在 ACC、GYRO 均更新后
+         * 才接收一条六轴样本，收满 32 条才推理；它只写自己的结果快照，绝不写入
+         * chassis_move 的速度、模式、PID 或电机控制字段。
          */
         BSP_RoadClassification_Process(&chassis_move.imu.jy901s);
 

@@ -4,21 +4,56 @@
  * 仅本实现文件接触 NanoEdge 原始 API。
  * 上层模块只使用 bsp_road_classification.h 中的自有类型，避免把库的 enum ABI
  * 和内部符号扩散到已验证的底盘、通信及界面代码。
+ *
+ * 本次库由 NanoEdge 以 soft-float、short-enum 导出，而 STM32H743 工程本身使用
+ * 硬浮点。这里之所以可以安全共存，是因为 NanoEdge 的公开函数只传递指针和整数，
+ * 没有任何按值传递的 float 参数或返回值；库内部软浮点代码调用 expf/logf/sqrtf
+ * 时，ARMCC 链接器会选择其 base-AAPCS 入口，再由运行库跳转到硬浮点实现。
+ * 因此只需让本文件按短 enum 编译，绝不能为了模型去改变全工程浮点 ABI。
+ * 如果未来 NanoEdge 公共 API 出现按值传递的 float/double，则必须重新审查 ABI，
+ * 不可照搬本次结论。
  */
 #include "NanoEdgeAI/NanoEdgeAI.h"
 
 #include <string.h>
 
 /*
+ * 编译期先核对“头文件契约”。运行时 Init() 还会通过 getter 再核对静态库本体，
+ * 因而能同时发现：只换了头文件、只换了 .a、或误放入其它模型这三类常见问题。
+ * ARMCC 5 不使用 C11 _Static_assert，这里用预处理错误保持兼容。
+ */
+#if (NEAI_INPUT_SIGNAL_LENGTH != BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES)
+#error "NanoEdge input signal length does not match road classification BSP"
+#endif
+
+#if (NEAI_INPUT_AXIS_NUMBER != BSP_ROAD_CLASSIFICATION_AXIS_COUNT)
+#error "NanoEdge axis count does not match road classification BSP"
+#endif
+
+#if (NEAI_NUMBER_OF_CLASSES != BSP_ROAD_CLASSIFICATION_CLASS_COUNT)
+#error "NanoEdge class count does not match road classification BSP"
+#endif
+
+/*
+ * 此常量对应本次 ZIP 内导出的 NanoEdgeAI.h。运行时核对 ID 可以阻止“只替换了
+ * .a 或只替换了 .h”的半更新状态；遇到这种情况时 BSP 进入 ERROR，但底盘照常跑。
+ */
+#define BSP_ROAD_CLASSIFICATION_EXPECTED_MODEL_ID "6a5b7983ae7a6f0e8fca6ba3"
+
+/*
  * NanoEdge 输入缓冲的布局必须是“时间优先”：
  * [第 0 帧 Ax, Ay, Az, Gx, Gy, Gz, 第 1 帧 Ax, ...]。
  * 原始训练 CSV 的列顺序正是 ACC_X_g、ACC_Y_g、ACC_Z_g、
- * GYRO_X_dps、GYRO_Y_dps、GYRO_Z_dps；不能改成六个轴各自连续存放。
+ * GYRO_X_dps、GYRO_Y_dps、GYRO_Z_dps；不能改成六个轴各自连续存放。这个布局
+ * 与 jy901s_nanoedge_logger.py 的 flatten_window() 一致。
  */
-static float s_input_signal[NEAI_INPUT_SIGNAL_LENGTH * NEAI_INPUT_AXIS_NUMBER];
+static float s_input_signal[BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES *
+                            BSP_ROAD_CLASSIFICATION_AXIS_COUNT];
 
 static BSP_RoadClassificationResult_t s_result;
 static uint32_t s_last_collected_imu_tick;
+static uint32_t s_last_collected_acc_sequence;
+static uint32_t s_last_collected_gyro_sequence;
 static uint8_t s_collected_samples;
 static uint8_t s_model_initialized;
 static float s_latest_imu_sample[BSP_ROAD_CLASSIFICATION_AXIS_COUNT];
@@ -49,13 +84,47 @@ static void BSP_RoadClassification_ExitCritical(uint32_t primask)
 }
 
 /*
+ * 公开结果中类别名以固定数组保存，调用者无需包含 NanoEdgeAI.h 或持有库内部
+ * 指针。复制时总会写入终止符，预热/错误状态会稳定显示为 "unknown"。
+ */
+static void BSP_RoadClassification_CopyClassName(char *destination,
+                                                  BSP_RoadClassificationClass_t class_id)
+{
+    const char *source;
+    uint32_t i;
+
+    if (destination == NULL)
+    {
+        return;
+    }
+
+    source = BSP_RoadClassification_GetClassName(class_id);
+    for (i = 0U; i < (BSP_ROAD_CLASSIFICATION_CLASS_NAME_LENGTH - 1U); i++)
+    {
+        destination[i] = source[i];
+        if (source[i] == '\0')
+        {
+            break;
+        }
+    }
+
+    /*
+     * 即使未来标签变长，也保证结果快照是合法 C 字符串；剩余字节清零可避免
+     * Keil Watch 中残留上一次较长标签的尾部。
+     */
+    for (; i < BSP_ROAD_CLASSIFICATION_CLASS_NAME_LENGTH; i++)
+    {
+        destination[i] = '\0';
+    }
+}
+
+/*
  * 在写入 s_result 的同一个临界区内刷新 Keil 调试镜像，保证观察者不会看到
  * "类别已更新但概率仍是上一帧" 这种长期不一致的状态。update_sequence 先变奇、
  * 结束后变偶：调试器恰好在写入过程中暂停时，可用该字段判断是否需要继续一次。
  */
 static void BSP_RoadClassification_UpdateDebugSnapshot(void)
 {
-    const char *class_name;
     uint32_t i;
 
     g_bsp_road_classification_debug.update_sequence++;
@@ -73,24 +142,14 @@ static void BSP_RoadClassification_UpdateDebugSnapshot(void)
         g_bsp_road_classification_debug.latest_imu_sample[i] = s_latest_imu_sample[i];
     }
 
-    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_CLASS_COUNT; i++)
+    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS; i++)
     {
         g_bsp_road_classification_debug.probabilities[i] = s_result.probabilities[i];
     }
 
-    class_name = BSP_RoadClassification_GetClassName(s_result.class_id);
     for (i = 0U; i < BSP_ROAD_CLASSIFICATION_CLASS_NAME_LENGTH; i++)
     {
-        g_bsp_road_classification_debug.class_name[i] = class_name[i];
-        if (class_name[i] == '\0')
-        {
-            break;
-        }
-    }
-    /* 类别名较短，但仍明确补零，避免调试器显示上一次较长字符串的尾部残留。 */
-    for (; i < BSP_ROAD_CLASSIFICATION_CLASS_NAME_LENGTH; i++)
-    {
-        g_bsp_road_classification_debug.class_name[i] = '\0';
+        g_bsp_road_classification_debug.class_name[i] = s_result.class_name[i];
     }
 
     g_bsp_road_classification_debug.update_sequence++;
@@ -99,16 +158,18 @@ static void BSP_RoadClassification_UpdateDebugSnapshot(void)
 static void BSP_RoadClassification_PublishWarmup(void)
 {
     uint32_t primask = BSP_RoadClassification_EnterCritical();
+    uint32_t i;
 
     if (s_model_initialized != 0U)
     {
         s_result.state = BSP_ROAD_CLASSIFICATION_WARMUP;
     }
     s_result.class_id = BSP_ROAD_CLASS_UNKNOWN;
-    s_result.probabilities[0] = 0.0f;
-    s_result.probabilities[1] = 0.0f;
-    s_result.probabilities[2] = 0.0f;
-    s_result.probabilities[3] = 0.0f;
+    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS; i++)
+    {
+        s_result.probabilities[i] = 0.0f;
+    }
+    BSP_RoadClassification_CopyClassName(s_result.class_name, s_result.class_id);
     s_result.collected_samples = s_collected_samples;
     s_result.has_result = 0U;
 
@@ -123,20 +184,28 @@ static void BSP_RoadClassification_PublishWarmup(void)
  */
 static void BSP_RoadClassification_ResetWindow(void)
 {
+    /*
+     * 只丢弃 AI 自己尚未送入推理的半窗；保留最近已消费的 ACC/GYRO 序号，
+     * 因而串口恢复时必须先收到两组真正的新帧，绝不会把掉线前的快照重放。
+     */
     s_collected_samples = 0U;
+    s_last_collected_imu_tick = 0U;
+    memset(s_input_signal, 0, sizeof(s_input_signal));
     BSP_RoadClassification_PublishWarmup();
 }
 
 static void BSP_RoadClassification_PublishError(int32_t neai_status)
 {
     uint32_t primask = BSP_RoadClassification_EnterCritical();
+    uint32_t i;
 
     s_result.state = BSP_ROAD_CLASSIFICATION_ERROR;
     s_result.class_id = BSP_ROAD_CLASS_UNKNOWN;
-    s_result.probabilities[0] = 0.0f;
-    s_result.probabilities[1] = 0.0f;
-    s_result.probabilities[2] = 0.0f;
-    s_result.probabilities[3] = 0.0f;
+    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS; i++)
+    {
+        s_result.probabilities[i] = 0.0f;
+    }
+    BSP_RoadClassification_CopyClassName(s_result.class_name, s_result.class_id);
     s_result.last_neai_status = neai_status;
     s_result.collected_samples = s_collected_samples;
     s_result.has_result = 0U;
@@ -151,13 +220,20 @@ static void BSP_RoadClassification_PublishResult(int class_id,
                                                   uint32_t classification_tick)
 {
     uint32_t primask = BSP_RoadClassification_EnterCritical();
+    uint32_t i;
 
     s_result.state = BSP_ROAD_CLASSIFICATION_READY;
     s_result.class_id = (BSP_RoadClassificationClass_t)class_id;
-    s_result.probabilities[0] = probabilities[0];
-    s_result.probabilities[1] = probabilities[1];
-    s_result.probabilities[2] = probabilities[2];
-    s_result.probabilities[3] = probabilities[3];
+    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_CLASS_COUNT; i++)
+    {
+        s_result.probabilities[i] = probabilities[i];
+    }
+    /* 兼容原有四槽 Watch；下标 2~3 不是新模型输出，必须始终明确清零。 */
+    for (; i < BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS; i++)
+    {
+        s_result.probabilities[i] = 0.0f;
+    }
+    BSP_RoadClassification_CopyClassName(s_result.class_name, s_result.class_id);
     s_result.last_classification_tick = classification_tick;
     s_result.last_neai_status = (int32_t)NEAI_OK;
     s_result.collected_samples = 0U;
@@ -171,14 +247,20 @@ static void BSP_RoadClassification_PublishResult(int class_id,
 uint8_t BSP_RoadClassification_Init(void)
 {
     enum neai_state neai_state;
+    const char *model_id;
+    const char *model_class_name;
+    uint32_t i;
 
     memset(s_input_signal, 0, sizeof(s_input_signal));
     memset(&s_result, 0, sizeof(s_result));
     memset(s_latest_imu_sample, 0, sizeof(s_latest_imu_sample));
     s_result.state = BSP_ROAD_CLASSIFICATION_UNINITIALIZED;
     s_result.class_id = BSP_ROAD_CLASS_UNKNOWN;
+    BSP_RoadClassification_CopyClassName(s_result.class_name, s_result.class_id);
     s_result.last_neai_status = (int32_t)NEAI_NOT_INITIALIZED;
     s_last_collected_imu_tick = 0U;
+    s_last_collected_acc_sequence = 0U;
+    s_last_collected_gyro_sequence = 0U;
     s_collected_samples = 0U;
     s_model_initialized = 0U;
 
@@ -194,15 +276,34 @@ uint8_t BSP_RoadClassification_Init(void)
     }
 
     /*
-     * 二次校验可防止日后误替换为其它 NanoEdge 导出包后发生缓冲区越界或误判。
-     * 当前模型应固定为 32 样本、6 轴、4 类。
+     * 二次校验可防止日后误替换为其它 NanoEdge 导出包后发生缓冲区越界或类别错标。
+     * 本次模型固定为 32 样本、6 轴、3 类，且模型 ID 必须与导入的 ZIP 一致。
      */
+    model_id = neai_get_id();
     if ((neai_get_input_signal_size() != (int)BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES) ||
         (neai_get_axis_number() != (int)BSP_ROAD_CLASSIFICATION_AXIS_COUNT) ||
-        (neai_get_number_of_classes() != (int)BSP_ROAD_CLASSIFICATION_CLASS_COUNT))
+        (neai_get_number_of_classes() != (int)BSP_ROAD_CLASSIFICATION_CLASS_COUNT) ||
+        (model_id == NULL) ||
+        (strcmp(model_id, BSP_ROAD_CLASSIFICATION_EXPECTED_MODEL_ID) != 0))
     {
         BSP_RoadClassification_PublishError((int32_t)NEAI_INVALID_PARAM);
         return 0U;
+    }
+
+    /*
+     * 类名也是模型契约的一部分。这样即使某个未来模型同样恰好是“32 x 6、3 类”，
+     * 也不会被错误解释成水泥/室内。NanoEdge 原始类型只在本 .c 内出现。
+     */
+    for (i = 0U; i < BSP_ROAD_CLASSIFICATION_CLASS_COUNT; i++)
+    {
+        model_class_name = neai_get_class_name((int)i);
+        if ((model_class_name == NULL) ||
+            (strcmp(model_class_name,
+                    BSP_RoadClassification_GetClassName((BSP_RoadClassificationClass_t)i)) != 0))
+        {
+            BSP_RoadClassification_PublishError((int32_t)NEAI_INVALID_PARAM);
+            return 0U;
+        }
     }
 
     s_model_initialized = 1U;
@@ -239,13 +340,32 @@ void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data)
         return;
     }
 
-    /* 同一 IMU 帧会被 100 Hz 底盘循环多次看到；重复帧绝不能重复塞入模型。 */
-    if (imu_data->last_update_tick == s_last_collected_imu_tick)
+    /*
+     * JY901S 的 ACC、GYRO、角度等属于不同 UART 帧，last_update_tick 每到一类
+     * 帧都会变化。训练 logger 的规则则是“ACC 与 GYRO 自上次写样本后都更新过”
+     * 才生成一行。因此仅比较 tick 会把同一物理采样拆成两行，导致窗口时序和
+     * 训练集不一致；这里用两个只读序号完成严格配对。
+     *
+     * DMA 一次送入多帧时，两个序号可能在同一个 HAL tick 内同时变化；序号而非
+     * tick 作为去重依据，正好避免毫秒分辨率造成的漏样本。
+     */
+    if ((imu_data->acc_update_sequence == s_last_collected_acc_sequence) ||
+        (imu_data->gyro_update_sequence == s_last_collected_gyro_sequence))
     {
+        /*
+         * 即使其他 IMU 帧仍在到达，只要没有新的六轴配对样本，就不能继续把旧
+         * 识别结果当作新数据。超过上限后回到预热，不写入任何底盘控制量。
+         */
+        if ((s_last_collected_imu_tick != 0U) &&
+            ((uint32_t)(now - s_last_collected_imu_tick) >
+             BSP_ROAD_CLASSIFICATION_MAX_SAMPLE_GAP_MS))
+        {
+            BSP_RoadClassification_ResetWindow();
+        }
         return;
     }
 
-    /* 两个新帧之间出现异常间隔时，先丢弃旧窗口，再把当前新帧作为第一帧。 */
+    /* 两条有效六轴样本之间出现异常间隔时，先丢弃旧窗口，再从当前样本重新预热。 */
     if ((s_last_collected_imu_tick != 0U) &&
         ((uint32_t)(imu_data->last_update_tick - s_last_collected_imu_tick) >
          BSP_ROAD_CLASSIFICATION_MAX_SAMPLE_GAP_MS))
@@ -253,7 +373,19 @@ void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data)
         BSP_RoadClassification_ResetWindow();
     }
 
+    /*
+     * 只有在确认两组数据均为新帧后才提交其序号。后续 100 Hz 循环即使重复看到
+     * 相同快照，也会在上面的配对判断处返回，不会重复污染 32 帧输入窗口。
+     */
+    s_last_collected_acc_sequence = imu_data->acc_update_sequence;
+    s_last_collected_gyro_sequence = imu_data->gyro_update_sequence;
     s_last_collected_imu_tick = imu_data->last_update_tick;
+
+    /* 防御性保护：正常流程在第 32 帧推理后会清零，异常状态也不能越界写缓冲。 */
+    if (s_collected_samples >= BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES)
+    {
+        BSP_RoadClassification_ResetWindow();
+    }
     input_offset = (uint32_t)s_collected_samples * BSP_ROAD_CLASSIFICATION_AXIS_COUNT;
 
     /*
@@ -327,12 +459,10 @@ const char *BSP_RoadClassification_GetClassName(BSP_RoadClassificationClass_t cl
 {
     switch (class_id)
     {
-        case BSP_ROAD_CLASS_OUTDOOR_MARBLE:
-            return "outdoor_marble";
-        case BSP_ROAD_CLASS_OUTDOOR_CEMENT:
-            return "outdoor_cement";
-        case BSP_ROAD_CLASS_INDOOR:
-            return "indoor";
+        case BSP_ROAD_CLASS_INDOORS:
+            return "indoors";
+        case BSP_ROAD_CLASS_CEMENT:
+            return "cement";
         case BSP_ROAD_CLASS_ASPHALT:
             return "asphalt";
         default:

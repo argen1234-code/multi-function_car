@@ -30,6 +30,13 @@ static void JY901S_UpdateScaledData(uint32_t flag)
         s_jy901s_data.acc[0] = sReg[AX] / 32768.0f * 16.0f;
         s_jy901s_data.acc[1] = sReg[AY] / 32768.0f * 16.0f;
         s_jy901s_data.acc[2] = sReg[AZ] / 32768.0f * 16.0f;
+
+        /*
+         * 这是一个纯观测序号：不影响原有 acc 数值、姿态、PID 或电机控制。
+         * JY901S 的 ACC 与 GYRO 分属不同串口帧，分类 BSP 必须知道两者均已
+         * 刷新，才能生成一条与上位机 logger 相同的六轴时间样本。
+         */
+        s_jy901s_data.acc_update_sequence++;
     }
 
     if (flag & JY901S_UPDATE_GYRO)
@@ -37,6 +44,9 @@ static void JY901S_UpdateScaledData(uint32_t flag)
         s_jy901s_data.gyro[0] = sReg[GX] / 32768.0f * 2000.0f;
         s_jy901s_data.gyro[1] = sReg[GY] / 32768.0f * 2000.0f;
         s_jy901s_data.gyro[2] = sReg[GZ] / 32768.0f * 2000.0f;
+
+        /* 同上：仅为分类采样配对提供“新陀螺帧”标记，不改变任何已有功能。 */
+        s_jy901s_data.gyro_update_sequence++;
     }
 
     if (flag & JY901S_UPDATE_ANGLE)

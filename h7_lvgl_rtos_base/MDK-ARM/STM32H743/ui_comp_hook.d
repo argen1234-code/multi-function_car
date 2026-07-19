@@ -1,1 +1,1 @@
-stm32h743\ui_comp_hook.o: ..\Middware\LVGL\demos\01_interactive_page\components\ui_comp_hook.c
+stm32h743_build\ui_comp_hook.o: ..\Middware\LVGL\demos\01_interactive_page\components\ui_comp_hook.c

@@ -24,6 +24,18 @@ typedef struct
     uint32_t update_flag;
     uint32_t last_update_tick;
     uint8_t online;
+
+    /*
+     * 两个轴组各自的单调递增序号。它们只记录“这一组物理量是否收到新帧”，
+     * 不参与姿态解算、底盘控制或串口协议；路面分类 BSP 用它们把 ACC 与 GYRO
+     * 配成一条与训练 logger 完全一致的六轴样本。
+     *
+     * 特意追加在结构体末尾，不插入原有字段之间：这样 acc/gyro/angle/mag、
+     * temperature、update_flag、last_update_tick、online 的原地址偏移全部保持不变，
+     * 原先 Keil Watch 中观察这些字段的表达式仍然有效。
+     */
+    uint32_t acc_update_sequence;
+    uint32_t gyro_update_sequence;
 } JY901S_Data_t;
 
 void JY901S_Init(void);

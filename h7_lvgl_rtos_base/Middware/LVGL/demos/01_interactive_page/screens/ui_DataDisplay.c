@@ -8,6 +8,7 @@
 #include "../ui_helpers.h"
 #include "ui_DataDetail.h"
 #include "app_chassis_board.h"
+#include "bsp_bluetooth.h"
 #include <stdio.h>
 
 #define PANEL_W   360
@@ -26,7 +27,6 @@ static const char * const road_conditions[] = {
 	"outdoor_cement",
 	"outdoor_marble"
 };
-static int road_index = 0;
 
 static lv_obj_t *lb_gps = NULL, *lb_speed = NULL, *lb_imu = NULL, *lb_mode = NULL;
 static lv_obj_t *lb_road = NULL;
@@ -119,7 +119,11 @@ static const char *mode_name_from_chassis(CarMode_t mode)
 
 static const char *road_condition_get(void)
 {
-	return road_conditions[road_index];
+	uint8_t index = (uint8_t)BT_GetRoadDisplay();
+	uint8_t count = (uint8_t)(sizeof(road_conditions) / sizeof(road_conditions[0]));
+
+	if (index >= count) index = 0U;
+	return road_conditions[index];
 }
 
 
@@ -188,10 +192,14 @@ static void panel_click(lv_event_t *e)
 
 static void road_change_cb(lv_event_t *e)
 {
+	uint8_t count;
+	uint8_t next;
+
 	if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
 
-	int count = (int)(sizeof(road_conditions) / sizeof(road_conditions[0]));
-	road_index = (road_index + 1) % count;
+	count = (uint8_t)(sizeof(road_conditions) / sizeof(road_conditions[0]));
+	next = (uint8_t)(((uint8_t)BT_GetRoadDisplay() + 1U) % count);
+	BT_SetRoadDisplay((BT_RoadDisplay_t)next);
 	refresh_values();
 }
 

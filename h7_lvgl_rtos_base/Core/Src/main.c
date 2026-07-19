@@ -138,7 +138,7 @@ int main(void)
 		MX_USART2_UART_Init();    // GPS
 		MX_USART6_UART_Init();    // JY901S IMU
 	//MX_UART4_Init();   // UART4 disabled: PC10 freed for SDMMC1_D2
-		MX_TIM3_Init();           // Encoder FR
+		MX_TIM3_Init();           // Encoder FR																								
 		MX_TIM5_Init();           // Encoder RR
 		MX_TIM8_Init();           // 4-channel motor PWM
 		MX_I2C1_Init();           // QMC5883 magnetometer

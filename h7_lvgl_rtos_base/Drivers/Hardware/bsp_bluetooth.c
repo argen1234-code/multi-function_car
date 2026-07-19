@@ -12,6 +12,7 @@ static volatile uint8_t      bt_key_state = 0U;
 static volatile BT_ModeReq_t bt_mode_req  = BT_MODE_REQ_NONE;
 static volatile uint8_t      bt_ack_count = 0U;
 static volatile uint32_t     bt_last_rx_tick = 0U;
+static volatile BT_RoadDisplay_t bt_road_display = BT_ROAD_DISPLAY_ASPHALT;
 static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
 static uint8_t               bt_frame_active = 0U;
@@ -258,11 +259,50 @@ static uint8_t bt_process_legacy_cmd_char(char ch)
     return 0U;
 }
 
+static uint8_t bt_process_road_token(const char *token)
+{
+    if (token == NULL || token[0] == '\0')
+    {
+        return 0U;
+    }
+
+    if (strcmp(token, "road_asphalt") == 0)
+    {
+        BT_SetRoadDisplay(BT_ROAD_DISPLAY_ASPHALT);
+        return 1U;
+    }
+
+    if (strcmp(token, "road_indoor") == 0)
+    {
+        BT_SetRoadDisplay(BT_ROAD_DISPLAY_INDOOR);
+        return 1U;
+    }
+
+    if (strcmp(token, "road_cement") == 0)
+    {
+        BT_SetRoadDisplay(BT_ROAD_DISPLAY_OUTDOOR_CEMENT);
+        return 1U;
+    }
+
+    if (strcmp(token, "road_marble") == 0)
+    {
+        BT_SetRoadDisplay(BT_ROAD_DISPLAY_OUTDOOR_MARBLE);
+        return 1U;
+    }
+
+    return 0U;
+}
+
 static uint8_t bt_process_token(const char *token)
 {
     if (token == NULL || token[0] == '\0')
     {
         return 0U;
+    }
+
+    if (bt_process_road_token(token))
+    {
+        return 1U;
     }
 
     if (strcmp(token, "g") == 0 || strcmp(token, "gps") == 0)
@@ -409,6 +449,7 @@ void BT_Init(void)
     bt_mode_req  = BT_MODE_REQ_NONE;
     bt_ack_count = 0U;
     bt_last_rx_tick = 0U;
+    bt_road_display = BT_ROAD_DISPLAY_ASPHALT;
     bt_frame_reset();
     bt_debug_reset();
     bt_debug_sync_state();
@@ -491,6 +532,45 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
     bt_debug_sync_state();
 }
 
+/*
+ * The phone application may end a road_* command with a UART idle gap instead
+ * of transmitting CR/LF. Accept only the four display commands in this path;
+ * motion and mode commands keep the original @payload\r\n protocol unchanged.
+ */
+void BT_ProcessRxIdle(void)
+{
+    char token[BT_TOKEN_MAX_LEN];
+    uint8_t i;
+
+    if (!bt_frame_active || bt_frame_saw_cr || bt_frame_len == 0U ||
+        bt_frame_len >= BT_TOKEN_MAX_LEN)
+    {
+        return;
+    }
+
+    for (i = 0U; i < bt_frame_len; i++)
+    {
+        if (!bt_is_token_char(bt_frame_buf[i]))
+        {
+            return;
+        }
+        token[i] = bt_to_lower(bt_frame_buf[i]);
+    }
+    token[bt_frame_len] = '\0';
+
+    if (!bt_process_road_token(token))
+    {
+        return;
+    }
+
+    bt_frame_buf[bt_frame_len] = '\0';
+    bt_last_rx_tick = HAL_GetTick();
+    bt_debug_capture_complete_frame();
+    bt_queue_ack();
+    bt_frame_reset();
+    bt_debug_sync_state();
+}
+
 /* Returns 1 if BT remote is actively sending motion commands */
 uint8_t BT_IsActive(void)
 {
@@ -522,6 +602,19 @@ uint8_t BT_GetKeyState(void)
 {
     g_bt_debug.key_state = bt_key_state;
     return bt_key_state;
+}
+
+BT_RoadDisplay_t BT_GetRoadDisplay(void)
+{
+    return bt_road_display;
+}
+
+void BT_SetRoadDisplay(BT_RoadDisplay_t road)
+{
+    if (road < BT_ROAD_DISPLAY_COUNT)
+    {
+        bt_road_display = road;
+    }
 }
 
 /* Returns current motion command, auto-fallback to STOP on timeout */

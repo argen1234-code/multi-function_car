@@ -269,6 +269,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		}
 
 		BT_ProcessRxData(uart1_rx_data, Size);
+		if (HAL_UARTEx_GetRxEventType(huart) == HAL_UART_RXEVENT_IDLE)
+		{
+			BT_ProcessRxIdle();
+		}
 
 		if (uart1_rx_mode_temp == UART_IT_ToIdle_RX)
 		{

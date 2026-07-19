@@ -28,6 +28,14 @@ typedef enum {
     BT_MODE_REQ_INDOOR
 } BT_ModeReq_t;
 
+/* Road text selected by Bluetooth or the existing LVGL transparent button. */
+typedef uint8_t BT_RoadDisplay_t;
+#define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)0U)
+#define BT_ROAD_DISPLAY_INDOOR           ((BT_RoadDisplay_t)1U)
+#define BT_ROAD_DISPLAY_OUTDOOR_CEMENT   ((BT_RoadDisplay_t)2U)
+#define BT_ROAD_DISPLAY_OUTDOOR_MARBLE   ((BT_RoadDisplay_t)3U)
+#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)4U)
+
 /*
  * Keil Watch debug mirror for the Bluetooth receive path.
  *
@@ -45,7 +53,7 @@ typedef struct
 
     uint32_t rx_event_count;        /* UART RX-to-idle callback count. */
     uint32_t rx_byte_count;         /* Total bytes observed by BT parser. */
-    uint32_t complete_frame_count;  /* Complete @payload\r\n frames. */
+    uint32_t complete_frame_count;  /* CRLF frames plus road-command idle fallback. */
     uint32_t accepted_token_count;  /* Frames/tokens that queued an ACK. */
     uint32_t ack_queued_count;      /* Number of ACKs queued successfully. */
     uint32_t frame_overflow_count;  /* Payloads exceeding parser capacity. */
@@ -80,11 +88,14 @@ extern volatile BT_Debug_t g_bt_debug;
 
 void           BT_Init(void);
 void           BT_ProcessRxData(uint8_t *pBuf, uint16_t Size);
+void           BT_ProcessRxIdle(void);
 BT_Motion_t    BT_GetMotion(void);
 uint8_t        BT_IsActive(void);
 uint8_t        BT_IsOnline(void);
 uint8_t        BT_GetKeyState(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
 uint8_t        BT_GetAndClearAckCount(void);
+BT_RoadDisplay_t BT_GetRoadDisplay(void);
+void           BT_SetRoadDisplay(BT_RoadDisplay_t road);
 
 #endif
