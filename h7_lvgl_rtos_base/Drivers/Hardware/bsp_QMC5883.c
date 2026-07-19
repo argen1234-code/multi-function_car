@@ -6,9 +6,24 @@ extern I2C_HandleTypeDef hi2c1;
 CalibParams params;
 volatile uint8_t qmc5883_calibrating = 0U;
 volatile uint16_t qmc5883_calibration_remaining_s = 0U;
+volatile QMC5883_Debug_t g_qmc5883_debug;
 static QMC5883_CalibrationStepCallback_t qmc5883_calibration_step_callback = 0;
 
 #define RAD_TO_DEG  (180.0 / 3.14159265358979323846)
+
+static void QMC5883_DebugSyncCalibration(void)
+{
+    g_qmc5883_debug.update_sequence++;
+    g_qmc5883_debug.calibrating = qmc5883_calibrating;
+    g_qmc5883_debug.calibration_remaining_s = qmc5883_calibration_remaining_s;
+    g_qmc5883_debug.calibration.offset_x = params.offset_x;
+    g_qmc5883_debug.calibration.offset_y = params.offset_y;
+    g_qmc5883_debug.calibration.offset_z = params.offset_z;
+    g_qmc5883_debug.calibration.scale_x = params.scale_x;
+    g_qmc5883_debug.calibration.scale_y = params.scale_y;
+    g_qmc5883_debug.calibration.scale_z = params.scale_z;
+    g_qmc5883_debug.update_sequence++;
+}
 
 void QMC5883_SetCalibrationStepCallback(QMC5883_CalibrationStepCallback_t callback)
 {
@@ -37,6 +52,7 @@ void QMC5883_Init(void)
     /* Safe defaults before calibration completes */
     params.offset_x = 0; params.offset_y = 0; params.offset_z = 0;
     params.scale_x = 1.0f; params.scale_y = 1.0f; params.scale_z = 1.0f;
+		QMC5883_DebugSyncCalibration();
 		Magnetometer_Calibration();  /* Start 30s calibration */
 }
 
@@ -52,13 +68,39 @@ void QMC5883_Init(void)
 void QMC5883_ReadRawData(int16_t *x, int16_t *y, int16_t *z)
 {
     uint8_t buf[6];
-    
-    
-    HAL_I2C_Mem_Read(&hi2c1, QMC5883_ADDR, 0x00, I2C_MEMADD_SIZE_8BIT, buf, 6, 100);
+    HAL_StatusTypeDef hal_status;
+    uint32_t now;
+
+    hal_status = HAL_I2C_Mem_Read(&hi2c1, QMC5883_ADDR, 0x00,
+                                 I2C_MEMADD_SIZE_8BIT, buf, 6, 100);
+    now = HAL_GetTick();
 
     *x = (int16_t)(buf[1] << 8 | buf[0]);
     *y = (int16_t)(buf[3] << 8 | buf[2]);
     *z = (int16_t)(buf[5] << 8 | buf[4]);
+
+    g_qmc5883_debug.update_sequence++;
+    g_qmc5883_debug.read_count++;
+    g_qmc5883_debug.last_hal_status = (uint8_t)hal_status;
+    g_qmc5883_debug.last_i2c_error = hi2c1.ErrorCode;
+    g_qmc5883_debug.last_read_tick = now;
+    g_qmc5883_debug.calibrating = qmc5883_calibrating;
+    g_qmc5883_debug.calibration_remaining_s = qmc5883_calibration_remaining_s;
+    if (hal_status == HAL_OK)
+    {
+        g_qmc5883_debug.read_ok_count++;
+        g_qmc5883_debug.last_success_tick = now;
+        g_qmc5883_debug.raw_x = *x;
+        g_qmc5883_debug.raw_y = *y;
+        g_qmc5883_debug.raw_z = *z;
+        g_qmc5883_debug.online = 1U;
+    }
+    else
+    {
+        g_qmc5883_debug.read_error_count++;
+        g_qmc5883_debug.online = 0U;
+    }
+    g_qmc5883_debug.update_sequence++;
 }
 
 /**
@@ -146,6 +188,8 @@ void Magnetometer_Calibration(void)
         params.scale_y = scale_y / max_scale;
         params.scale_z = scale_z / max_scale;
     }
+
+    QMC5883_DebugSyncCalibration();
 }
 
 /**
@@ -167,6 +211,12 @@ void QMC5883_Get_CalibrationData(float *hx, float *hy, float *hz)
     *hx = ((float)temp_hx - params.offset_x) * params.scale_x;
     *hy = ((float)temp_hy - params.offset_y) * params.scale_y;
     *hz = ((float)temp_hz - params.offset_z) * params.scale_z;
+
+    g_qmc5883_debug.update_sequence++;
+    g_qmc5883_debug.calibrated_x = *hx;
+    g_qmc5883_debug.calibrated_y = *hy;
+    g_qmc5883_debug.calibrated_z = *hz;
+    g_qmc5883_debug.update_sequence++;
 }
 
 /**
@@ -195,6 +245,15 @@ void QMC5883_GetAngles(EulerAngles *angles)
     /* Compute Roll */
     angles->roll = atan2((double)x, sqrt(y*y + z*z)) * RAD_TO_DEG;
     angles->last_update_tick = HAL_GetTick();
+
+    g_qmc5883_debug.update_sequence++;
+    g_qmc5883_debug.yaw = angles->yaw;
+    g_qmc5883_debug.pitch = angles->pitch;
+    g_qmc5883_debug.roll = angles->roll;
+    g_qmc5883_debug.last_angle_tick = angles->last_update_tick;
+    g_qmc5883_debug.calibrating = qmc5883_calibrating;
+    g_qmc5883_debug.calibration_remaining_s = qmc5883_calibration_remaining_s;
+    g_qmc5883_debug.update_sequence++;
 
 }
 

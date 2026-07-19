@@ -32,6 +32,92 @@ static T_GNTHS tgnths;
 static T_AGRIC tagric;
 static T_GPHPR tgphpr;
 
+/* Keil Watch-only GPS mirror. No control path reads this object. */
+volatile GPS_Debug_t g_gps_debug;
+
+static double GPS_DebugNmeaToDegree(double nmea_coordinate, char direction)
+{
+	double degrees = (double)((uint32_t)(nmea_coordinate / 100.0));
+	double decimal = degrees + (nmea_coordinate - degrees * 100.0) / 60.0;
+
+	if (direction == 'S' || direction == 'W')
+	{
+		decimal = -decimal;
+	}
+
+	return decimal;
+}
+
+static void GPS_DebugCaptureRx(uint16_t size)
+{
+	g_gps_debug.update_sequence++;
+	g_gps_debug.rx_event_count++;
+	g_gps_debug.rx_byte_count += size;
+	g_gps_debug.last_rx_event_tick = HAL_GetTick();
+	g_gps_debug.last_rx_size = size;
+	g_gps_debug.update_sequence++;
+}
+
+static void GPS_DebugUpdateGGA(void)
+{
+	uint8_t latitude_direction_valid = (tgngga.lat_dir == 'N' || tgngga.lat_dir == 'S') ? 1U : 0U;
+	uint8_t longitude_direction_valid = (tgngga.lon_dir == 'E' || tgngga.lon_dir == 'W') ? 1U : 0U;
+	uint8_t valid = (tgngga.qf >= 1U && latitude_direction_valid && longitude_direction_valid) ? 1U : 0U;
+
+	g_gps_debug.update_sequence++;
+	g_gps_debug.gga_update_count++;
+	g_gps_debug.last_message_type = GPS_DEBUG_MSG_GGA;
+	g_gps_debug.last_decoded_tick = tgngga.last_update_tick;
+	g_gps_debug.position_valid = valid;
+	g_gps_debug.utc_time = tgngga.utc_time;
+	g_gps_debug.latitude_deg = GPS_DebugNmeaToDegree(tgngga.lat, tgngga.lat_dir);
+	g_gps_debug.longitude_deg = GPS_DebugNmeaToDegree(tgngga.lon, tgngga.lon_dir);
+	g_gps_debug.altitude_m = tgngga.Alt;
+	g_gps_debug.hdop = tgngga.Hdop;
+	g_gps_debug.differential_age_s = tgngga.Age;
+	g_gps_debug.fix_quality = tgngga.qf;
+	g_gps_debug.satellites = tgngga.sats;
+	g_gps_debug.latitude_direction = tgngga.lat_dir;
+	g_gps_debug.longitude_direction = tgngga.lon_dir;
+	g_gps_debug.gga_last_update_tick = tgngga.last_update_tick;
+	g_gps_debug.gga = tgngga;
+	g_gps_debug.update_sequence++;
+}
+
+static void GPS_DebugUpdateTHS(char mode)
+{
+	g_gps_debug.update_sequence++;
+	g_gps_debug.ths_update_count++;
+	g_gps_debug.last_message_type = GPS_DEBUG_MSG_THS;
+	g_gps_debug.last_decoded_tick = tgnths.last_update_tick;
+	g_gps_debug.ths_last_update_tick = tgnths.last_update_tick;
+	g_gps_debug.ths = tgnths;
+	g_gps_debug.ths.Mode = mode;
+	g_gps_debug.update_sequence++;
+}
+
+static void GPS_DebugUpdateHPR(void)
+{
+	g_gps_debug.update_sequence++;
+	g_gps_debug.hpr_update_count++;
+	g_gps_debug.last_message_type = GPS_DEBUG_MSG_HPR;
+	g_gps_debug.last_decoded_tick = tgphpr.last_update_tick;
+	g_gps_debug.hpr_last_update_tick = tgphpr.last_update_tick;
+	g_gps_debug.hpr = tgphpr;
+	g_gps_debug.update_sequence++;
+}
+
+static void GPS_DebugUpdateAGRIC(void)
+{
+	g_gps_debug.update_sequence++;
+	g_gps_debug.agric_update_count++;
+	g_gps_debug.last_message_type = GPS_DEBUG_MSG_AGRIC;
+	g_gps_debug.last_decoded_tick = tagric.last_update_tick;
+	g_gps_debug.agric_last_update_tick = tagric.last_update_tick;
+	g_gps_debug.agric = tagric;
+	g_gps_debug.update_sequence++;
+}
+
 /* ---- Accessor functions ---- */
 
 /**
@@ -70,6 +156,7 @@ void AGRIC_Analy(PT_AGRIC ptAGRIC)
 {
 	tagric = *ptAGRIC;
 	tagric.last_update_tick = HAL_GetTick();
+	GPS_DebugUpdateAGRIC();
 }
 
 /**
@@ -192,6 +279,7 @@ static void GNGGA_Decode(char* str)
 	strcpy(tgngga.stn_ID, data[13]);
 	strcpy(tgngga.crc, data[14]);
 	tgngga.last_update_tick = HAL_GetTick(); /* Timestamp for staleness detection */
+	GPS_DebugUpdateGGA();
 }
 
 /**
@@ -228,6 +316,7 @@ static void GNTHS_Decode(char *str)
 	tgnths.Mode = atof(data[1]);
 	strcpy(tgnths.crc, data[2]);
 	tgnths.last_update_tick = HAL_GetTick();
+	GPS_DebugUpdateTHS(*data[1]);
 }
 
 /**
@@ -275,6 +364,7 @@ static void GNHPR_Decode(char* str)
 	strcpy(tgphpr.stn_ID, data[7]);
 	strcpy(tgphpr.crc, data[8]);
 	tgphpr.last_update_tick = HAL_GetTick();
+	GPS_DebugUpdateHPR();
 }
 
 /**
@@ -340,6 +430,7 @@ unsigned char ucAGRIC[512] = {0};
 void GPS_RxPro_HAL(uint8_t* pBuf, uint16_t Size)
 {
 	if(Size == 0) return;
+	GPS_DebugCaptureRx(Size);
 
 	uint16_t i = 0;
 	char *pHead = NULL;

@@ -19,7 +19,7 @@
 #include <stdio.h>
 
 /* ---- GPS waypoint count ---- */
-#define CHASSIS_GPS_ROUTE_COUNT  2U
+#define CHASSIS_GPS_ROUTE_COUNT  3U
 
 /* ---- Jetson timeout (ms); no valid frame within this period -> offline ---- */
 #define JETSON_TIMEOUT_MS  500U
@@ -34,14 +34,13 @@
 
 /* ---- Preset GPS cruise route ---- */
 static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
-    {26.449634, 106.650672},
- {26.449691, 106.650650}
-		
-		
+    {26.4496462053, 106.6506097728},
+ {26.44971106083, 106.6506362568},
+ {26.44964648217, 106.6507009095},
 };
 
 /* Sole chassis instance; not directly accessible externally, only via pointer */
-static chassis_move_t    chassis_move    = {0};
+chassis_move_t    chassis_move    = {0};
 static volatile int gui_req_mode = -1;
 static uint8_t chassis_manual_indoor_mode = 0U;
 static volatile uint8_t chassis_init_done = 0U;
@@ -1068,14 +1067,14 @@ void chassis_task(void *pvParameters)
     /* -- One-time initialization -- */ 
     chassis_init(&chassis_move);
     chassis_set_init_status("Init QMC5883");
-	//QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
-	//QMC5883_Init();
-	//QMC5883_SetCalibrationStepCallback(NULL);
-	Motor_SetAllPWM(0, 0, 0, 0);
-	chassis_stop(&chassis_move);
-	chassis_clear_motor_output(&chassis_move);
+	  QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
+	  QMC5883_Init();
+	  QMC5883_SetCalibrationStepCallback(NULL);
+	  Motor_SetAllPWM(0, 0, 0, 0);
+	  chassis_stop(&chassis_move);
+	  chassis_clear_motor_output(&chassis_move);
     chassis_set_init_status("Init GPS");
-	GPS_Init();
+	  GPS_Init();
     chassis_set_init_status("Modules Ready");
     chassis_init_done = 1U;
 

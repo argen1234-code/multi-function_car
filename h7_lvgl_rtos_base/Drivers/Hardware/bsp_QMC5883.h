@@ -21,6 +21,38 @@ typedef struct {
     float scale_x, scale_y, scale_z;      /* Soft-iron scale */
 } CalibParams;
 
+/*
+ * Keil Watch-only mirror for the QMC5883 receive and calculation path.
+ * The application never reads this structure, so changing it cannot affect
+ * navigation, calibration, chassis control, PID, or motor output.
+ */
+typedef struct {
+    uint32_t update_sequence;
+    uint32_t read_count;
+    uint32_t read_ok_count;
+    uint32_t read_error_count;
+    uint32_t last_read_tick;
+    uint32_t last_success_tick;
+    uint32_t last_angle_tick;
+    uint32_t last_i2c_error;
+    int16_t raw_x;
+    int16_t raw_y;
+    int16_t raw_z;
+    uint8_t last_hal_status;          /* 0=HAL_OK, 1=ERROR, 2=BUSY, 3=TIMEOUT */
+    uint8_t online;                  /* Latest raw read returned HAL_OK */
+    uint8_t calibrating;
+    uint8_t reserved0;
+    uint16_t calibration_remaining_s;
+    uint16_t reserved1;
+    float calibrated_x;
+    float calibrated_y;
+    float calibrated_z;
+    float yaw;
+    float pitch;
+    float roll;
+    CalibParams calibration;
+} QMC5883_Debug_t;
+
 /* Initialize QMC5883: configure registers and run 30-second calibration. */
 void QMC5883_Init(void);
 
@@ -41,5 +73,6 @@ void QMC5883_Get_CalibrationData(float *hx, float *hy, float *hz);
 
 extern volatile uint8_t qmc5883_calibrating;
 extern volatile uint16_t qmc5883_calibration_remaining_s;
+extern volatile QMC5883_Debug_t g_qmc5883_debug;
 
 #endif

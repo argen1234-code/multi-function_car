@@ -191,6 +191,117 @@ typedef struct{
 	uint32_t last_update_tick;  /**< HAL tick when this struct was last updated */
 }T_GPHPR, *PT_GPHPR;
 
+/* Message identifier stored in GPS_Debug_t.last_message_type. */
+#define GPS_DEBUG_MSG_NONE   0U
+#define GPS_DEBUG_MSG_GGA    1U
+#define GPS_DEBUG_MSG_THS    2U
+#define GPS_DEBUG_MSG_HPR    3U
+#define GPS_DEBUG_MSG_AGRIC  4U
+
+/* Navigation source stored in GPS_NavigationDebug_t.navigation_mode. */
+#define GPS_DEBUG_NAV_MODE_NONE    0U
+#define GPS_DEBUG_NAV_MODE_PURE    1U
+#define GPS_DEBUG_NAV_MODE_FUSION  2U
+
+/**
+ * @brief Navigation target/error snapshot shown as g_gps_debug.navigation.
+ *
+ * This subgroup is refreshed only by app_Navigation.c while GPS navigation is
+ * running or stopping. It mirrors controller state and final Vx/Vy/Wz targets;
+ * the control path never reads values back from this object.
+ */
+typedef struct GPS_NavigationDebug_s
+{
+    uint32_t update_sequence;
+    uint32_t last_update_tick;
+    uint32_t dwell_start_tick;
+
+    uint8_t is_navigating;
+    uint8_t loop_enable;
+    uint8_t phase;                  /* 0 idle, 1 running, 2 dwelling. */
+    uint8_t rtk_quality;
+    uint8_t current_waypoint_index; /* Zero-based route index. */
+    uint8_t total_waypoints;
+    uint8_t navigation_mode;        /* GPS_DEBUG_NAV_MODE_* */
+    uint8_t reserved;
+
+    double current_latitude_deg;
+    double current_longitude_deg;
+    double target_latitude_deg;
+    double target_longitude_deg;
+
+    float current_heading_deg;
+    float target_bearing_deg;
+    float distance_error_m;
+    float heading_error_deg;
+    float command_vx;
+    float command_vy;
+    float command_wz;
+} GPS_NavigationDebug_t;
+
+/**
+ * @brief Keil Watch-only mirror of the complete GPS receive/parse state.
+ *
+ * Add the single symbol g_gps_debug to a Keil Watch window and expand it.
+ * Expand navigation for target-point and controller-error data. The GPS driver
+ * writes the receiver fields, while app_Navigation.c writes only navigation.
+ * Navigation, chassis mode arbitration, PID and motor output never read values
+ * back from this object, so it cannot become a control input.
+ *
+ * update_sequence is incremented before and after each mirror update. An even
+ * value represents a complete snapshot; if the debugger stops on an odd value,
+ * run/step once and inspect it again.
+ */
+typedef struct GPS_Debug_s
+{
+    uint32_t update_sequence;
+
+    /* Target point, waypoint index, distance/heading error and Vx/Vy/Wz. */
+    GPS_NavigationDebug_t navigation;
+
+    /* UART receive-path activity. */
+    uint32_t rx_event_count;
+    uint32_t rx_byte_count;
+    uint32_t last_rx_event_tick;
+    uint16_t last_rx_size;
+    uint8_t last_message_type;  /* GPS_DEBUG_MSG_* */
+    uint8_t position_valid;     /* Latest GGA has qf >= 1 and valid N/S + E/W fields. */
+
+    /* Successful decode counters and most recent decoded-message tick. */
+    uint32_t gga_update_count;
+    uint32_t ths_update_count;
+    uint32_t hpr_update_count;
+    uint32_t agric_update_count;
+    uint32_t last_decoded_tick;
+
+    /* Convenient top-level GGA position/fix fields. */
+    double utc_time;
+    double latitude_deg;       /* Signed WGS-84 decimal degrees. */
+    double longitude_deg;      /* Signed WGS-84 decimal degrees. */
+    float altitude_m;
+    float hdop;
+    float differential_age_s;
+    uint8_t fix_quality;       /* 0 invalid, 1 GPS, 2 DGPS, 4 RTK fixed, 5 RTK float. */
+    uint8_t satellites;
+    char latitude_direction;
+    char longitude_direction;
+
+    /* Source-specific freshness timestamps. */
+    uint32_t gga_last_update_tick;
+    uint32_t ths_last_update_tick;
+    uint32_t hpr_last_update_tick;
+    uint32_t agric_last_update_tick;
+
+    /* Complete latest decoded source structures for detailed expansion. */
+    T_GNGGA gga;
+    T_GNTHS ths;
+    T_GPHPR hpr;
+    T_AGRIC agric;
+} GPS_Debug_t;
+
+/* Read-only from control/debugger perspective; written only as a debug mirror. */
+extern volatile GPS_Debug_t g_gps_debug;
+
 /* ---- Public function prototypes ---- */
 
 /**

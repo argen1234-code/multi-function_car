@@ -14,6 +14,41 @@ static float Min_speed = 60.0f;   /* 克服底盘低速死区的最小平移速�
 static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */
 static float Max_wz  = 18.0f;     /* 最大旋转角速度限制 */
 
+/* Keil Watch-only navigation mirror; no control code reads it back. */
+static void Navigation_DebugSync(struct chassis_move_s *chassis, uint8_t navigation_mode)
+{
+    Navigation_State_t *nav;
+    volatile GPS_NavigationDebug_t *debug;
+
+    if (chassis == NULL) return;
+
+    nav = &chassis->nav;
+    debug = &g_gps_debug.navigation;
+
+    debug->update_sequence++;
+    debug->last_update_tick = HAL_GetTick();
+    debug->dwell_start_tick = nav->dwell_start_tick;
+    debug->is_navigating = nav->is_navigating;
+    debug->loop_enable = nav->loop_enable;
+    debug->phase = (uint8_t)nav->phase;
+    debug->rtk_quality = nav->rtk_quality;
+    debug->current_waypoint_index = nav->current_wp_index;
+    debug->total_waypoints = nav->total_waypoints;
+    debug->navigation_mode = navigation_mode;
+    debug->current_latitude_deg = nav->current_pos.lat;
+    debug->current_longitude_deg = nav->current_pos.lon;
+    debug->target_latitude_deg = nav->target_pos.lat;
+    debug->target_longitude_deg = nav->target_pos.lon;
+    debug->current_heading_deg = nav->current_heading;
+    debug->target_bearing_deg = nav->target_bearing;
+    debug->distance_error_m = nav->distance_error;
+    debug->heading_error_deg = nav->heading_error;
+    debug->command_vx = chassis->Vx_set;
+    debug->command_vy = chassis->Vy_set;
+    debug->command_wz = chassis->Wz_set;
+    debug->update_sequence++;
+}
+
 /* ============================================================
  *  内部: 加载航点路线
  * ============================================================ */
@@ -130,6 +165,7 @@ void Navigation_Stop(struct chassis_move_s *chassis)
     chassis->Vx_set = 0.0f;
     chassis->Vy_set = 0.0f;
     chassis->Wz_set = 0.0f;
+    Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_NONE);
 }
 
 /* ============================================================
@@ -144,6 +180,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     Navigation_State_t *nav = &chassis->nav;
 
     if (!nav->is_navigating) {
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
         return;
     }
 
@@ -162,6 +199,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
             nav->target_pos = nav->route[nav->current_wp_index];
             nav->phase      = NAV_PHASE_RUNNING;
         }
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
         return;
     }
 
@@ -176,6 +214,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
         chassis->Vx_set = 0.0f;
         chassis->Vy_set = 0.0f;
         chassis->Wz_set = 0.0f;
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
         return;
     }
 
@@ -214,6 +253,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
             nav->dwell_start_tick = HAL_GetTick();
             nav->phase = NAV_PHASE_DWELLING;
         }
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
         return;
     }
 
@@ -243,6 +283,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     chassis->Vx_set = out_vx;
     chassis->Vy_set = out_vy;
     chassis->Wz_set = out_wz;
+    Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
 }
 
 /* ============================================================
@@ -261,7 +302,10 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
 
     Navigation_State_t *nav = &chassis->nav;
 
-    if (!nav->is_navigating) return;
+    if (!nav->is_navigating) {
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_FUSION);
+        return;
+    }
 
     /* ---- 停留等待阶段 (同纯GPS) ---- */
     if (nav->phase == NAV_PHASE_DWELLING) {
@@ -278,6 +322,7 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
             nav->target_pos = nav->route[nav->current_wp_index];
             nav->phase      = NAV_PHASE_RUNNING;
         }
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_FUSION);
         return;
     }
 
@@ -294,6 +339,7 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
         chassis->Vx_set = 0.0f;
         chassis->Vy_set = 0.0f;
         chassis->Wz_set = 0.0f;
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_FUSION);
         return;
     }
 
@@ -334,6 +380,7 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
             nav->dwell_start_tick = HAL_GetTick();
             nav->phase = NAV_PHASE_DWELLING;
         }
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_FUSION);
         return;
     }
 
@@ -375,4 +422,5 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
     chassis->Vx_set = out_vx;
     chassis->Vy_set = out_vy;
     chassis->Wz_set = out_wz;
+    Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_FUSION);
 }
