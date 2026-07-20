@@ -293,6 +293,16 @@ typedef enum {
     CHASSIS_GPS_ROUTE_RESULT_FULL
 } ChassisGPSRouteResult_t;
 
+typedef enum {
+    CHASSIS_GPS_ROUTE_STORAGE_NONE = 0,
+    CHASSIS_GPS_ROUTE_STORAGE_LOADED,
+    CHASSIS_GPS_ROUTE_STORAGE_SAVED,
+    CHASSIS_GPS_ROUTE_STORAGE_EMPTY,
+    CHASSIS_GPS_ROUTE_STORAGE_ERASE_ERROR,
+    CHASSIS_GPS_ROUTE_STORAGE_PROGRAM_ERROR,
+    CHASSIS_GPS_ROUTE_STORAGE_VERIFY_ERROR
+} ChassisGPSRouteStorageStatus_t;
+
 /* ============================================================
  *  External interface
  * ============================================================ */
@@ -312,6 +322,9 @@ extern volatile int chassis_last_bt_req_debug;
 extern chassis_move_t *const chassis_debug;
 extern volatile uint8_t g_chassis_gps_route_count_debug;
 extern volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug;
+extern volatile ChassisGPSRouteStorageStatus_t g_chassis_gps_route_storage_status_debug;
+extern volatile uint32_t g_chassis_gps_route_storage_sequence_debug;
+extern volatile uint8_t g_chassis_gps_route_storage_slot_debug;
 extern volatile uint8_t g_chassis_mag_initialized_debug;
 
 /* Main loop 5 steps (defined here for external module replacement) */
