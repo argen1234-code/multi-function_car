@@ -312,6 +312,20 @@ static uint8_t bt_process_token(const char *token)
         return 1U;
     }
 
+    if (strcmp(token, "gps_add") == 0 ||
+        strcmp(token, "gps_point") == 0 ||
+        strcmp(token, "gps_sample") == 0)
+    {
+        bt_mode_req = BT_MODE_REQ_GPS_ADD_POINT;
+        return 1U;
+    }
+
+    if (strcmp(token, "gps_clear") == 0)
+    {
+        bt_mode_req = BT_MODE_REQ_GPS_CLEAR_POINTS;
+        return 1U;
+    }
+
     if (strcmp(token, "i") == 0 ||
         strcmp(token, "indoor") == 0 ||
         strcmp(token, "bt") == 0 ||

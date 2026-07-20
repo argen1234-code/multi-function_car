@@ -273,6 +273,14 @@ typedef struct {
     chassis_pid_param_t pid_param;
 } ChassisSettings_t;
 
+typedef enum {
+    CHASSIS_GPS_ROUTE_RESULT_NONE = 0,
+    CHASSIS_GPS_ROUTE_RESULT_POINT_ADDED,
+    CHASSIS_GPS_ROUTE_RESULT_CLEARED,
+    CHASSIS_GPS_ROUTE_RESULT_INVALID_FIX,
+    CHASSIS_GPS_ROUTE_RESULT_FULL
+} ChassisGPSRouteResult_t;
+
 /* ============================================================
  *  External interface
  * ============================================================ */
@@ -290,6 +298,9 @@ extern volatile int gui_req_mode;   /* GUI mode request (-1=none, 0..6=CarMode_t
 extern volatile CarMode_t chassis_current_mode_debug;
 extern volatile int chassis_last_bt_req_debug;
 extern chassis_move_t *const chassis_debug;
+extern volatile uint8_t g_chassis_gps_route_count_debug;
+extern volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug;
+extern volatile uint8_t g_chassis_mag_initialized_debug;
 
 /* Main loop 5 steps (defined here for external module replacement) */
 extern void chassis_mode_change(chassis_move_t *chassis);

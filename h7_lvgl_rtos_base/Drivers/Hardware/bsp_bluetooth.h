@@ -21,11 +21,13 @@ typedef enum {
     BT_MOTION_ROTATE_RIGHT
 } BT_Motion_t;
 
-/* Mode request received over Bluetooth */
+/* Mode/action request received over Bluetooth */
 typedef enum {
     BT_MODE_REQ_NONE = 0,
     BT_MODE_REQ_GPS,
-    BT_MODE_REQ_INDOOR
+    BT_MODE_REQ_INDOOR,
+    BT_MODE_REQ_GPS_ADD_POINT,
+    BT_MODE_REQ_GPS_CLEAR_POINTS
 } BT_ModeReq_t;
 
 /* Road text selected by Bluetooth or the existing LVGL transparent button. */

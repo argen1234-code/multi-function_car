@@ -18,26 +18,26 @@
 #include <math.h>
 #include <stdio.h>
 
-/* ---- GPS waypoint count ---- */
-#define CHASSIS_GPS_ROUTE_COUNT  3U
-
 /* ---- Jetson timeout (ms); no valid frame within this period -> offline ---- */
 #define JETSON_TIMEOUT_MS  500U
 #define GPS_ONLINE_TIMEOUT_MS  3000U
 
-/* ---- Power-on magnetometer calibration motion (ms / internal Wz units) ---- */
+/* ---- On-demand magnetometer calibration motion (ms / internal Wz units) ---- */
 #define MAG_CALIB_WZ                 50.0f
 #define MAG_CALIB_STILL_END_MS       2000U
 #define MAG_CALIB_CW_END_MS         14000U
 #define MAG_CALIB_PAUSE_END_MS      15000U
 #define MAG_CALIB_CCW_END_MS        27000U
 
-/* ---- Preset GPS cruise route ---- */
-static GPS_Point_t chassis_gps_route[CHASSIS_GPS_ROUTE_COUNT] = {
-    {26.4496462053, 106.6506097728},
- {26.44971106083, 106.6506362568},
- {26.44964648217, 106.6507009095},
-};
+/* ---- Central command slew-rate limits (internal speed units per second) ---- */
+#define CHASSIS_TRANSLATION_SLEW_PER_S  300.0f
+#define CHASSIS_ROTATION_SLEW_PER_S     200.0f
+#define CHASSIS_SMOOTH_DEFAULT_DT_S       0.01f
+#define CHASSIS_SMOOTH_MAX_DT_S           0.05f
+
+/* ---- Runtime sampled GPS route; intentionally empty after each power-up. ---- */
+static GPS_Point_t chassis_gps_route[MAX_WAYPOINTS] = {0};
+static uint8_t chassis_gps_route_count = 0U;
 
 /* Sole chassis instance; not directly accessible externally, only via pointer */
 chassis_move_t    chassis_move    = {0};
@@ -45,6 +45,16 @@ static volatile int gui_req_mode = -1;
 static uint8_t chassis_manual_indoor_mode = 0U;
 static volatile uint8_t chassis_init_done = 0U;
 static char chassis_init_status[64] = "Init pending";
+static uint8_t chassis_mag_initialized = 0U;
+static uint8_t chassis_mag_initializing = 0U;
+static float chassis_smoothed_vx = 0.0f;
+static float chassis_smoothed_vy = 0.0f;
+static float chassis_smoothed_wz = 0.0f;
+static uint32_t chassis_smooth_last_tick = 0U;
+
+volatile uint8_t g_chassis_gps_route_count_debug = 0U;
+volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_NONE;
+volatile uint8_t g_chassis_mag_initialized_debug = 0U;
 
 /*
  * 全局可见的 JY901S 调试镜像。volatile 用于保证即使打开优化，Keil Watch 读取的
@@ -293,14 +303,229 @@ static void chassis_clear_motor_output(chassis_move_t *chassis)
     }
 }
 
+static double chassis_nmea_to_degree(double coordinate, char direction)
+{
+    double degrees = floor(coordinate / 100.0);
+    double decimal = degrees + (coordinate - degrees * 100.0) / 60.0;
+
+    if (direction == 'S' || direction == 'W')
+    {
+        decimal = -decimal;
+    }
+
+    return decimal;
+}
+
+static float chassis_slew_toward(float current, float target, float max_delta)
+{
+    float delta = target - current;
+
+    if (delta > max_delta) return current + max_delta;
+    if (delta < -max_delta) return current - max_delta;
+    return target;
+}
+
+static void chassis_apply_control_smoothing(chassis_move_t *chassis)
+{
+    uint32_t now;
+    float dt_s;
+    float target_vx;
+    float target_vy;
+    float target_wz;
+
+    if (chassis == NULL) return;
+
+    now = HAL_GetTick();
+
+    /*
+     * Preserve the original pure-GPS dead-zone behavior: directly use the
+     * navigation output (including Min_speed) and stop immediately when the
+     * waypoint controller writes zero. GPS+ROS still uses the common smoother.
+     */
+    if (chassis->mode == CAR_MODE_GPS)
+    {
+        chassis_smoothed_vx = chassis->Vx_set;
+        chassis_smoothed_vy = chassis->Vy_set;
+        chassis_smoothed_wz = chassis->Wz_set;
+        chassis_smooth_last_tick = now;
+
+        g_gps_debug.navigation.update_sequence++;
+        g_gps_debug.navigation.command_vx = chassis->Vx_set;
+        g_gps_debug.navigation.command_vy = chassis->Vy_set;
+        g_gps_debug.navigation.command_wz = chassis->Wz_set;
+        g_gps_debug.navigation.update_sequence++;
+        return;
+    }
+
+    if (chassis_smooth_last_tick == 0U)
+    {
+        dt_s = CHASSIS_SMOOTH_DEFAULT_DT_S;
+    }
+    else
+    {
+        dt_s = (float)(now - chassis_smooth_last_tick) * 0.001f;
+        if (dt_s <= 0.0f) dt_s = CHASSIS_SMOOTH_DEFAULT_DT_S;
+        if (dt_s > CHASSIS_SMOOTH_MAX_DT_S) dt_s = CHASSIS_SMOOTH_MAX_DT_S;
+    }
+    chassis_smooth_last_tick = now;
+
+    target_vx = chassis->Vx_set;
+    target_vy = chassis->Vy_set;
+    target_wz = chassis->Wz_set;
+
+    chassis_smoothed_vx = chassis_slew_toward(
+        chassis_smoothed_vx, target_vx, CHASSIS_TRANSLATION_SLEW_PER_S * dt_s);
+    chassis_smoothed_vy = chassis_slew_toward(
+        chassis_smoothed_vy, target_vy, CHASSIS_TRANSLATION_SLEW_PER_S * dt_s);
+    chassis_smoothed_wz = chassis_slew_toward(
+        chassis_smoothed_wz, target_wz, CHASSIS_ROTATION_SLEW_PER_S * dt_s);
+
+    chassis->Vx_set = chassis_smoothed_vx;
+    chassis->Vy_set = chassis_smoothed_vy;
+    chassis->Wz_set = chassis_smoothed_wz;
+
+    if (chassis->mode == CAR_MODE_GPS_ROS)
+    {
+        g_gps_debug.navigation.update_sequence++;
+        g_gps_debug.navigation.command_vx = chassis->Vx_set;
+        g_gps_debug.navigation.command_vy = chassis->Vy_set;
+        g_gps_debug.navigation.command_wz = chassis->Wz_set;
+        g_gps_debug.navigation.update_sequence++;
+    }
+}
+
+static void chassis_reset_control_smoothing(chassis_move_t *chassis)
+{
+    chassis_smoothed_vx = 0.0f;
+    chassis_smoothed_vy = 0.0f;
+    chassis_smoothed_wz = 0.0f;
+    chassis_smooth_last_tick = HAL_GetTick();
+
+    if (chassis != NULL)
+    {
+        chassis->Vx_set = 0.0f;
+        chassis->Vy_set = 0.0f;
+        chassis->Wz_set = 0.0f;
+    }
+}
+
+static void chassis_clear_gps_route(chassis_move_t *chassis)
+{
+    uint8_t i;
+    uint8_t is_nav_mode;
+
+    is_nav_mode = (chassis != NULL &&
+                  (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS)) ? 1U : 0U;
+
+    for (i = 0U; i < MAX_WAYPOINTS; i++)
+    {
+        chassis_gps_route[i].lat = 0.0;
+        chassis_gps_route[i].lon = 0.0;
+    }
+    chassis_gps_route_count = 0U;
+    g_chassis_gps_route_count_debug = 0U;
+    g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_CLEARED;
+
+    if (chassis != NULL)
+    {
+        if (is_nav_mode) Navigation_Stop(chassis);
+
+        for (i = 0U; i < MAX_WAYPOINTS; i++)
+        {
+            chassis->nav.route[i].lat = 0.0;
+            chassis->nav.route[i].lon = 0.0;
+        }
+        chassis->nav.total_waypoints = 0U;
+        chassis->nav.current_wp_index = 0U;
+        chassis->nav.target_pos.lat = 0.0;
+        chassis->nav.target_pos.lon = 0.0;
+        chassis->nav.distance_error = 0.0f;
+        chassis->nav.heading_error = 0.0f;
+    }
+}
+
+static uint8_t chassis_add_current_gps_point(chassis_move_t *chassis)
+{
+    PT_GNGGA gga;
+    GPS_Point_t point;
+
+    if (chassis_gps_route_count >= MAX_WAYPOINTS)
+    {
+        g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_FULL;
+        return 0U;
+    }
+
+    gga = GetGNGGA();
+    if (gga == NULL || gga->last_update_tick == 0U ||
+        (HAL_GetTick() - gga->last_update_tick) > GPS_ONLINE_TIMEOUT_MS ||
+        gga->qf < 1U || gga->lat < 1.0 || gga->lon < 1.0 ||
+        (gga->lat_dir != 'N' && gga->lat_dir != 'S') ||
+        (gga->lon_dir != 'E' && gga->lon_dir != 'W'))
+    {
+        g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_INVALID_FIX;
+        return 0U;
+    }
+
+    point.lat = chassis_nmea_to_degree(gga->lat, gga->lat_dir);
+    point.lon = chassis_nmea_to_degree(gga->lon, gga->lon_dir);
+    chassis_gps_route[chassis_gps_route_count] = point;
+    chassis_gps_route_count++;
+    g_chassis_gps_route_count_debug = chassis_gps_route_count;
+    g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_POINT_ADDED;
+
+    if (chassis != NULL &&
+        (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS))
+    {
+        Navigation_Set_Route_Loop(&chassis->nav,
+                                  chassis_gps_route,
+                                  chassis_gps_route_count);
+    }
+
+    return 1U;
+}
+
+static void chassis_init_magnetometer_once(chassis_move_t *chassis)
+{
+    if (chassis_mag_initialized || chassis_mag_initializing) return;
+
+    chassis_mag_initializing = 1U;
+    chassis_set_init_status("Init QMC5883");
+    QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
+    QMC5883_Init();
+    QMC5883_SetCalibrationStepCallback(NULL);
+    Motor_SetAllPWM(0, 0, 0, 0);
+    chassis_stop(chassis);
+    chassis_clear_motor_output(chassis);
+    chassis_reset_control_smoothing(chassis);
+
+    if (chassis != NULL)
+    {
+        QMC5883_GetAngles(&chassis->imu.mag);
+        chassis->imu.mag_last_update_tick = chassis->imu.mag.last_update_tick;
+    }
+
+    chassis_mag_initialized = 1U;
+    chassis_mag_initializing = 0U;
+    g_chassis_mag_initialized_debug = 1U;
+    chassis_set_init_status("Modules Ready");
+}
+
 /* ============================================================
  *  Internal: Start GPS cyclic cruise
  * ============================================================ */
 static void chassis_start_gps_navigation(chassis_move_t *chassis)
 {
+    if (chassis == NULL) return;
+
+    if (chassis_gps_route_count == 0U)
+    {
+        Navigation_Stop(chassis);
+        return;
+    }
+
     Navigation_Set_Route_Loop(&chassis->nav,
                               chassis_gps_route,
-                              CHASSIS_GPS_ROUTE_COUNT);
+                              chassis_gps_route_count);
 }
 
 static uint8_t chassis_is_jetson_online(chassis_move_t *chassis)
@@ -477,6 +702,11 @@ static void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode)
     was_nav_mode = (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS) ? 1U : 0U;
     is_nav_mode = (mode == CAR_MODE_GPS || mode == CAR_MODE_GPS_ROS) ? 1U : 0U;
 
+    if (is_nav_mode)
+    {
+        chassis_init_magnetometer_once(chassis);
+    }
+
     if (!was_nav_mode || !is_nav_mode)
     {
         Navigation_Stop(chassis);
@@ -507,9 +737,12 @@ void chassis_feedback_update(chassis_move_t *chassis)
 
     now = HAL_GetTick();
 
-    /* Magnetometer -> chassis->imu.mag */
-    QMC5883_GetAngles(&chassis->imu.mag);
-    chassis->imu.mag_last_update_tick = now;
+    /* Magnetometer remains untouched until the first GPS-class mode. */
+    if (chassis_mag_initialized)
+    {
+        QMC5883_GetAngles(&chassis->imu.mag);
+        chassis->imu.mag_last_update_tick = chassis->imu.mag.last_update_tick;
+    }
 
     {
         JY901S_Data_t jy901s_data;
@@ -684,7 +917,7 @@ void chassis_control_loop(chassis_move_t *chassis)
 }
 
 /* ============================================================
- *  Power-on QMC5883 calibration motion step (called every 10 ms).
+ *  On-demand QMC5883 calibration motion step.
  *  Keeps the original magnetometer sampling/calculation unchanged while
  *  using the existing encoder feedback, kinematics and motor speed PID.
  * ============================================================ */
@@ -714,6 +947,7 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms)
         chassis_move.Wz_set = MAG_CALIB_WZ;
     }
 
+    chassis_apply_control_smoothing(&chassis_move);
     chassis_control_loop(&chassis_move);
 
     for (i = 0U; i < 4U; i++)
@@ -781,6 +1015,14 @@ void chassis_mode_change(chassis_move_t *chassis)
                 chassis_manual_indoor_mode = 0U;
                 Chassis_SetMode(chassis, CAR_MODE_IDLE);
             }
+            return;
+
+        case BT_MODE_REQ_GPS_ADD_POINT:
+            (void)chassis_add_current_gps_point(chassis);
+            return;
+
+        case BT_MODE_REQ_GPS_CLEAR_POINTS:
+            chassis_clear_gps_route(chassis);
             return;
 
         default:
@@ -1006,6 +1248,7 @@ void chassis_set_control(chassis_move_t *chassis)
     }
 
     chassis_apply_gain(chassis);
+    chassis_apply_control_smoothing(chassis);
 }
 
 /* ============================================================
@@ -1023,6 +1266,7 @@ void chassis_send_cmd(chassis_move_t *chassis)
 
     if (chassis->mode == CAR_MODE_IDLE)
     {
+        chassis_reset_control_smoothing(chassis);
         chassis_clear_motor_output(chassis);
         for (uint8_t i = 0; i < 4; i++)
         {
@@ -1066,15 +1310,13 @@ void chassis_task(void *pvParameters)
 
     /* -- One-time initialization -- */ 
     chassis_init(&chassis_move);
-    chassis_set_init_status("Init QMC5883");
-	  QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
-	  QMC5883_Init();
-	  QMC5883_SetCalibrationStepCallback(NULL);
-	  Motor_SetAllPWM(0, 0, 0, 0);
-	  chassis_stop(&chassis_move);
-	  chassis_clear_motor_output(&chassis_move);
+    chassis_set_init_status("QMC5883 deferred");
+    Motor_SetAllPWM(0, 0, 0, 0);
+    chassis_stop(&chassis_move);
+    chassis_clear_motor_output(&chassis_move);
+    chassis_reset_control_smoothing(&chassis_move);
     chassis_set_init_status("Init GPS");
-	  GPS_Init();
+    GPS_Init();
     chassis_set_init_status("Modules Ready");
     chassis_init_done = 1U;
 
