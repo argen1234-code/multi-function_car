@@ -44,13 +44,14 @@ chassis_move_t    chassis_move    = {0};
 static volatile int gui_req_mode = -1;
 static uint8_t chassis_manual_indoor_mode = 0U;
 static volatile uint8_t chassis_init_done = 0U;
-static char chassis_init_status[64] = "Init pending";
+static char chassis_init_status[64] = "\xE7\xAD\x89\xE5\xBE\x85\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96";
 static uint8_t chassis_mag_initialized = 0U;
 static uint8_t chassis_mag_initializing = 0U;
 static float chassis_smoothed_vx = 0.0f;
 static float chassis_smoothed_vy = 0.0f;
 static float chassis_smoothed_wz = 0.0f;
 static uint32_t chassis_smooth_last_tick = 0U;
+static uint32_t chassis_scene_sequence = 0U;
 
 volatile uint8_t g_chassis_gps_route_count_debug = 0U;
 volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_NONE;
@@ -171,6 +172,13 @@ void chassis_get_telemetry(ChassisTelemetry_t *out)
     out->ins_pitch = chassis_move.imu.ins.euler.pitch;
     out->ins_yaw = chassis_move.imu.ins.euler.yaw;
     out->ins_last_update_tick = chassis_move.imu.ins_last_update_tick;
+    for (i = 0U; i < 3U; i++)
+    {
+        out->jy901s_acc[i] = chassis_move.imu.jy901s.acc[i];
+        out->jy901s_gyro[i] = chassis_move.imu.jy901s.gyro[i];
+    }
+    out->jy901s_last_update_tick = chassis_move.imu.jy901s.last_update_tick;
+    out->jy901s_online = chassis_move.imu.jy901s.online;
     out->mag_yaw = chassis_move.imu.mag.yaw;
     out->mag_pitch = chassis_move.imu.mag.pitch;
     out->mag_roll = chassis_move.imu.mag.roll;
@@ -186,6 +194,17 @@ void chassis_get_telemetry(ChassisTelemetry_t *out)
     }
     out->qmc_calibrating = qmc5883_calibrating;
     out->qmc_calibration_remaining_s = qmc5883_calibration_remaining_s;
+    out->gps_route_count = chassis_gps_route_count;
+    for (i = 0U; i < MAX_WAYPOINTS; i++)
+    {
+        out->gps_route[i] = chassis_gps_route[i];
+    }
+    out->gps_current_wp_index = chassis_move.nav.current_wp_index;
+    out->gps_is_navigating = chassis_move.nav.is_navigating;
+    out->gps_loop_enable = chassis_move.nav.loop_enable;
+    out->gps_nav_phase = chassis_move.nav.phase;
+    out->gps_distance_error = chassis_move.nav.distance_error;
+    out->gps_heading_error = chassis_move.nav.heading_error;
     taskEXIT_CRITICAL();
 }
 
@@ -489,7 +508,7 @@ static void chassis_init_magnetometer_once(chassis_move_t *chassis)
     if (chassis_mag_initialized || chassis_mag_initializing) return;
 
     chassis_mag_initializing = 1U;
-    chassis_set_init_status("Init QMC5883");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96QMC5883");
     QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
     QMC5883_Init();
     QMC5883_SetCalibrationStepCallback(NULL);
@@ -507,7 +526,7 @@ static void chassis_init_magnetometer_once(chassis_move_t *chassis)
     chassis_mag_initialized = 1U;
     chassis_mag_initializing = 0U;
     g_chassis_mag_initialized_debug = 1U;
-    chassis_set_init_status("Modules Ready");
+    chassis_set_init_status("\xE6\xA8\xA1\xE5\x9D\x97\xE5\xB7\xB2\xE5\xB0\xB1\xE7\xBB\xAA");
 }
 
 /* ============================================================
@@ -768,13 +787,29 @@ void chassis_feedback_update(chassis_move_t *chassis)
         chassis->motor[i].last_update_tick = now;
     }
 
-    /* USB Jetson 12-byte frame -> chassis->cmd_vel */
+    /* USB Jetson cmd_vel / scene_cmd frames. */
     if (usb_rx_flag)
     {
         USB_ProcessRxData(UserRxBufferFS, (uint16_t)usb_rx_len);
         usb_rx_flag = 0;
     }
     chassis->cmd_vel = USB_GetCmdVel();
+    {
+        scene_cmd_t scene = USB_GetSceneCmd();
+
+        if (scene.update_sequence != chassis_scene_sequence)
+        {
+            chassis_scene_sequence = scene.update_sequence;
+            if (scene.scene == JETSON_SCENE_INDOOR)
+            {
+                BT_SetRoadDisplay(BT_ROAD_DISPLAY_MARBLE);
+            }
+            else if (scene.scene == JETSON_SCENE_OUTDOOR)
+            {
+                BT_SetRoadDisplay(BT_ROAD_DISPLAY_ASPHALT);
+            }
+        }
+    }
     if (chassis->cmd_vel.mode != 0)
     {
         chassis->jetson_last_tick = HAL_GetTick();
@@ -820,27 +855,28 @@ static void chassis_init(chassis_move_t *chassis)
 {
     double speed_pid_param[3];
 
-    chassis_set_init_status("Init Encoder");
+	BT_ServicePendingAck();
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE7\xBC\x96\xE7\xA0\x81\xE5\x99\xA8");
     Encoder_Init();
-    chassis_set_init_status("Init Motor");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE7\x94\xB5\xE6\x9C\xBA");
     Motor_Init();
-    chassis_set_init_status("Init Bluetooth");
-    BT_Init();
-    chassis_set_init_status("Init USB");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE8\x93\x9D\xE7\x89\x99");
+	BT_ServicePendingAck();
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96USB");
     USB_Init();
-    chassis_set_init_status("Init UART1");
-    uart_init(&huart1, UART_DMA_ToIdle_RX);
-    chassis_set_init_status("Init UART2");
+	BT_ServicePendingAck();
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96UART2");
     uart_init(&huart2, UART_DMA_ToIdle_RX);
-    chassis_set_init_status("Init JY901S");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96JY901S");
     JY901S_Init();
 
     /*
      * 路面识别只维护自己的 NanoEdge 缓冲和结果快照。即使模型初始化失败，
      * 底盘初始化与后续控制仍按原有路径继续，绝不因此改变 PID 或电机输出。
      */
-    chassis_set_init_status("Init Road AI");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE8\xB7\xAF\xE9\x9D\xA2\xE8\xAF\x86\xE5\x88\xAB");
     (void)BSP_RoadClassification_Init();
+	BT_ServicePendingAck();
 
     /* Remote control parameter defaults */
     chassis->remote.bt_speed         = BT_REMOTE_SPEED;
@@ -873,11 +909,12 @@ static void chassis_init(chassis_move_t *chassis)
 
     /* WonderEcho needs brief stabilization after power-on, then init PB0/PB1 software I2C.
        Init remains in the chassis task; no new FreeRTOS task, avoiding concurrent chassis speed writes. */
-    chassis_set_init_status("Init Voice");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE8\xAF\xAD\xE9\x9F\xB3");
     osDelay(200);
+	BT_ServicePendingAck();
     WonderEcho_I2C_Init();
 
-    chassis_set_init_status("Init PID");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96PID");
     for (uint8_t i = 0; i < 4; i++)
     {
         PID_init(&chassis->motor[i].speed_pid, PID_POSITION,
@@ -889,7 +926,7 @@ static void chassis_init(chassis_move_t *chassis)
     {
         chassis->motor[i].speed_set = 0;
     }
-    chassis_set_init_status("Chassis Init OK");
+    chassis_set_init_status("\xE5\xBA\x95\xE7\x9B\x98\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96\xE5\xAE\x8C\xE6\x88\x90");
 }
 
 /* ============================================================
@@ -1256,13 +1293,11 @@ void chassis_set_control(chassis_move_t *chassis)
  *    IDLE mode: clear motors + send telemetry.
  *    Normal mode: PID output -> motor PWM + USB telemetry to Jetson.
  * ============================================================ */
-static void chassis_send_bt_ack(void);
-
 void chassis_send_cmd(chassis_move_t *chassis)
 {
     if (chassis == NULL) return;
 
-    chassis_send_bt_ack();
+	BT_ServicePendingAck();
 
     if (chassis->mode == CAR_MODE_IDLE)
     {
@@ -1288,19 +1323,6 @@ void chassis_send_cmd(chassis_move_t *chassis)
                       chassis->date_to_usb.current_lon);
 }
 
-static void chassis_send_bt_ack(void)
-{
-    uint8_t ack_count = BT_GetAndClearAckCount();
-    static const uint8_t ack_msg[] = {'o', 'k', '\r', '\n'};
-
-    while (ack_count > 0U)
-    {
-        HAL_UART_Transmit(&huart1, (uint8_t *)ack_msg, sizeof(ack_msg), 10U);
-        ack_count--;
-    }
-}
-
-
 /* ============================================================
  *  FreeRTOS task entry
  * ============================================================ */
@@ -1310,14 +1332,14 @@ void chassis_task(void *pvParameters)
 
     /* -- One-time initialization -- */ 
     chassis_init(&chassis_move);
-    chassis_set_init_status("QMC5883 deferred");
+    chassis_set_init_status("QMC5883\xE7\xAD\x89\xE5\xBE\x85\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96");
     Motor_SetAllPWM(0, 0, 0, 0);
     chassis_stop(&chassis_move);
     chassis_clear_motor_output(&chassis_move);
     chassis_reset_control_smoothing(&chassis_move);
-    chassis_set_init_status("Init GPS");
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96GPS");
     GPS_Init();
-    chassis_set_init_status("Modules Ready");
+    chassis_set_init_status("\xE6\xA8\xA1\xE5\x9D\x97\xE5\xB7\xB2\xE5\xB0\xB1\xE7\xBB\xAA");
     chassis_init_done = 1U;
 
 //		/* 路面识别直行测试：仅本次测试使用 */
@@ -1350,4 +1372,10 @@ void chassis_task(void *pvParameters)
         chassis_send_cmd(&chassis_move);          /* Motor output + USB telemetry */
         osDelay(10);
     }
+}
+
+/* GPS_Init() is synchronous; service Bluetooth ACKs during its existing 500 ms waits. */
+void GPS_InitBackgroundHook(void)
+{
+	BT_ServicePendingAck();
 }

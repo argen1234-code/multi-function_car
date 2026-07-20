@@ -17,9 +17,23 @@ typedef struct {
     float   vz;      /* 角速度 (rad/s), 正值左转 (Z轴向上) */
 } cmd_vel_t;
 
+/* Jetson scene_cmd: BB 55 cmd XOR, cmd=1 indoor / 2 outdoor. */
+typedef enum {
+    JETSON_SCENE_NONE    = 0,
+    JETSON_SCENE_INDOOR  = 1,
+    JETSON_SCENE_OUTDOOR = 2
+} JetsonScene_t;
+
+typedef struct {
+    JetsonScene_t scene;
+    uint32_t last_update_tick;
+    uint32_t update_sequence;
+} scene_cmd_t;
+
 void       USB_Init(void);
 void       USB_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 cmd_vel_t  USB_GetCmdVel(void);
+scene_cmd_t USB_GetSceneCmd(void);
 void       USB_SendTelemetry(float heading_to_target_deg,
                              float current_lat,
                              float current_lon);

@@ -250,6 +250,10 @@ typedef struct {
     float ins_pitch;
     float ins_yaw;
     uint32_t ins_last_update_tick;
+    float jy901s_acc[3];
+    float jy901s_gyro[3];
+    uint32_t jy901s_last_update_tick;
+    uint8_t jy901s_online;
     float mag_yaw;
     float mag_pitch;
     float mag_roll;
@@ -262,6 +266,14 @@ typedef struct {
     uint32_t motor_last_update_tick[4];
     uint8_t qmc_calibrating;
     uint16_t qmc_calibration_remaining_s;
+    GPS_Point_t gps_route[MAX_WAYPOINTS];
+    uint8_t gps_route_count;
+    uint8_t gps_current_wp_index;
+    uint8_t gps_is_navigating;
+    uint8_t gps_loop_enable;
+    Navigation_Phase_t gps_nav_phase;
+    float gps_distance_error;
+    float gps_heading_error;
 } ChassisTelemetry_t;
 
 /* ============================================================

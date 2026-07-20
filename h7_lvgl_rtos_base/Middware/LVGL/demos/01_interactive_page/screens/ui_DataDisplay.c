@@ -19,13 +19,18 @@
 #define WHEEL_FEEDBACK_ACTIVE_RPM 3.0f
 #define WHEEL_ERROR_RPM           35.0f
 
+/* ARMCC5 source strings use explicit UTF-8 bytes for the LVGL Chinese font. */
+#define ROAD_TEXT_PREFIX       "\xE8\xB7\xAF\xE9\x9D\xA2: "
+#define ROAD_TEXT_NOT_STARTED  "\xE6\x9C\xAA\xE5\xBC\x80\xE5\xA7\x8B\xE8\xAF\x86\xE5\x88\xAB"
+#define ROAD_TEXT_MARBLE       "\xE5\xA4\xA7\xE7\x90\x86\xE7\x9F\xB3"
+#define ROAD_TEXT_ASPHALT      "\xE6\x9F\x8F\xE6\xB2\xB9\xE8\xB7\xAF"
+
 lv_obj_t *ui_DataDisplay = NULL;
 
 static const char * const road_conditions[] = {
-	"asphalt",
-	"indoor",
-	"outdoor_cement",
-	"outdoor_marble"
+	ROAD_TEXT_NOT_STARTED,
+	ROAD_TEXT_MARBLE,
+	ROAD_TEXT_ASPHALT
 };
 
 static lv_obj_t *lb_gps = NULL, *lb_speed = NULL, *lb_imu = NULL, *lb_mode = NULL;
@@ -89,30 +94,30 @@ static const char *wheel_summary_text(const ChassisTelemetry_t *data)
 {
 	uint8_t i;
 
-	if (data == NULL) return "OFFLINE";
+	if (data == NULL) return "\xE7\xA6\xBB\xE7\xBA\xBF";
 
 	for (i = 0U; i < 4U; i++) {
-		if (!wheel_online(data, i)) return "Wheel OFFLINE";
+		if (!wheel_online(data, i)) return "\xE8\xBD\xA6\xE8\xBD\xAE\xE7\xA6\xBB\xE7\xBA\xBF";
 	}
 
 	for (i = 0U; i < 4U; i++) {
-		if (wheel_fault(data, i)) return "Wheel FAULT";
+		if (wheel_fault(data, i)) return "\xE8\xBD\xA6\xE8\xBD\xAE\xE6\x95\x85\xE9\x9A\x9C";
 	}
 
-	return "Wheel OK";
+	return "\xE8\xBD\xA6\xE8\xBD\xAE\xE6\xAD\xA3\xE5\xB8\xB8";
 }
 
 
 static const char *mode_name_from_chassis(CarMode_t mode)
 {
 	switch (mode) {
-	case CAR_MODE_IDLE:    return "No Power";
-	case CAR_MODE_GPS:     return "GPS Nav";
+	case CAR_MODE_IDLE:    return "\xE6\x9C\xAA\xE4\xB8\x8A\xE7\x94\xB5";
+	case CAR_MODE_GPS:     return "GPS\xE5\xAF\xBC\xE8\x88\xAA";
 	case CAR_MODE_GPS_ROS: return "GPS+ROS";
-	case CAR_MODE_REMOTE:  return "WeChat";
-	case CAR_MODE_LINE:    return "ROS Indoor";
-	case CAR_MODE_INDOOR:  return "Bluetooth";
-	case CAR_MODE_VOICE:   return "Voice";
+	case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
+	case CAR_MODE_LINE:    return "ROS\xE5\xAE\xA4\xE5\x86\x85";
+	case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";
+	case CAR_MODE_VOICE:   return "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6";
 	default:               return "--";
 	}
 }
@@ -149,9 +154,9 @@ static void refresh_values(void)
 	if (lb_gps)   {
 		if (sensor_tick_online(data.gps_last_update_tick, GPS_TIMEOUT_MS)) {
 			snprintf(buf,sizeof(buf),
-			         "Lat: %.5f\nLon: %.5f", data.gps_lat, data.gps_lon);
+			         "\xE7\xBA\xAC\xE5\xBA\xA6: %.5f\n\xE7\xBB\x8F\xE5\xBA\xA6: %.5f", data.gps_lat, data.gps_lon);
 		} else {
-			snprintf(buf,sizeof(buf),"OFFLINE");
+			snprintf(buf,sizeof(buf),"\xE7\xA6\xBB\xE7\xBA\xBF");
 		}
 		lv_label_set_text(lb_gps, buf);
 	}
@@ -163,7 +168,7 @@ static void refresh_values(void)
 			         data.wz_set,
 			         wheel_summary_text(&data));
 		} else {
-			snprintf(buf,sizeof(buf),"OFFLINE");
+			snprintf(buf,sizeof(buf),"\xE7\xA6\xBB\xE7\xBA\xBF");
 		}
 		lv_label_set_text(lb_speed,buf);
 	}
@@ -175,12 +180,12 @@ static void refresh_values(void)
 			         data.ins_pitch,
 			         data.ins_yaw);
 		} else {
-			snprintf(buf,sizeof(buf),"OFFLINE");
+			snprintf(buf,sizeof(buf),"\xE7\xA6\xBB\xE7\xBA\xBF");
 		}
 		lv_label_set_text(lb_imu, buf);
 	}
 	if (lb_mode)  { lv_label_set_text(lb_mode, mode_name_from_chassis(data.mode)); }
-	if (lb_road)  { snprintf(buf,sizeof(buf),"Road: %s", road_condition_get()); lv_label_set_text(lb_road, buf); }
+	if (lb_road)  { snprintf(buf,sizeof(buf),ROAD_TEXT_PREFIX "%s", road_condition_get()); lv_label_set_text(lb_road, buf); }
 }
 
 static void panel_click(lv_event_t *e)
@@ -192,14 +197,15 @@ static void panel_click(lv_event_t *e)
 
 static void road_change_cb(lv_event_t *e)
 {
-	uint8_t count;
-	uint8_t next;
+	BT_RoadDisplay_t current;
+	BT_RoadDisplay_t next;
 
 	if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
 
-	count = (uint8_t)(sizeof(road_conditions) / sizeof(road_conditions[0]));
-	next = (uint8_t)(((uint8_t)BT_GetRoadDisplay() + 1U) % count);
-	BT_SetRoadDisplay((BT_RoadDisplay_t)next);
+	current = BT_GetRoadDisplay();
+	next = (current == BT_ROAD_DISPLAY_MARBLE) ?
+	       BT_ROAD_DISPLAY_ASPHALT : BT_ROAD_DISPLAY_MARBLE;
+	BT_SetRoadDisplay(next);
 	refresh_values();
 }
 
@@ -226,13 +232,13 @@ static lv_obj_t *add_panel(lv_obj_t *parent, const char *icon, const char *title
 	lv_obj_t *tl = lv_label_create(pnl);
 	lv_label_set_text(tl, title);
 	lv_obj_set_style_text_color(tl, lv_color_hex(UI_COLOR_TEXT_MUTED), 0);
-	lv_obj_set_style_text_font(tl, &lv_font_montserrat_14, 0);
+	lv_obj_set_style_text_font(tl, &ui_font_CN14, 0);
 	lv_obj_align_to(tl, ic, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
 
 	lv_obj_t *vl = lv_label_create(pnl);
 	lv_label_set_text(vl, "--");
 	lv_obj_set_style_text_color(vl, lv_color_hex(UI_COLOR_CYAN_DARK), 0);
-	lv_obj_set_style_text_font(vl, &lv_font_montserrat_14, 0);
+	lv_obj_set_style_text_font(vl, &ui_font_CN14, 0);
 	lv_obj_align(vl, LV_ALIGN_LEFT_MID, 20, 15);
 
 	if (val_out) *val_out = vl;
@@ -252,15 +258,15 @@ static void add_road_control(lv_obj_t *parent, lv_coord_t y)
 
 	lb_road = lv_label_create(box);
 	lv_obj_set_size(lb_road, 440, 40);
-	lv_label_set_text(lb_road, "Road: asphalt");
+	lv_label_set_text(lb_road, ROAD_TEXT_PREFIX ROAD_TEXT_NOT_STARTED);
 	lv_obj_set_style_text_color(lb_road, lv_color_hex(UI_COLOR_CYAN_DARK), 0);
-	lv_obj_set_style_text_font(lb_road, &ui_font_Font2, 0);
+	lv_obj_set_style_text_font(lb_road, &ui_font_Road, 0);
 	lv_obj_set_style_text_align(lb_road, LV_TEXT_ALIGN_CENTER, 0);
 	lv_label_set_long_mode(lb_road, LV_LABEL_LONG_CLIP);
 	lv_obj_align(lb_road, LV_ALIGN_TOP_MID, 0, 4);
 
 	lv_obj_t *btn = lv_btn_create(box);
-	lv_obj_set_size(btn, 120, 24);
+	lv_obj_set_size(btn, 120, 30);
 	lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -6);
 	lv_obj_set_style_bg_opa(btn, LV_OPA_TRANSP, 0);
 	lv_obj_set_style_border_width(btn, 0, 0);
@@ -270,7 +276,6 @@ static void add_road_control(lv_obj_t *parent, lv_coord_t y)
 
 	lv_obj_t *btn_label = lv_label_create(btn);
 	lv_label_set_text(btn_label, "");
-	lv_obj_set_style_text_font(btn_label, &lv_font_montserrat_14, 0);
 	lv_obj_center(btn_label);
 }
 
@@ -291,18 +296,18 @@ void ui_DataDisplay_screen_init(void)
 
 	/* Title */
 	lv_obj_t *t = lv_label_create(ui_DataDisplay);
-	lv_label_set_text(t, "Car Dashboard");
+	lv_label_set_text(t, "\xE8\xBD\xA6\xE8\xBE\x86\xE6\x95\xB0\xE6\x8D\xAE\xE7\x9B\x91\xE6\x8E\xA7");
 	lv_obj_set_style_text_color(t, lv_color_hex(UI_COLOR_BLUE_DARK), 0);
-	lv_obj_set_style_text_font(t, &ui_font_FontTitle, 0);
+	lv_obj_set_style_text_font(t, &ui_font_CN64, 0);
 	lv_obj_align(t, LV_ALIGN_TOP_MID, 0, 10);
 
 	lv_coord_t x0 = (1024 - PANEL_W * 2 - 20) / 2;   /* center the 2-column grid */
 	lv_coord_t y0 = 100;
 
 	lv_obj_t *p0 = add_panel(ui_DataDisplay, LV_SYMBOL_GPS,   "GPS",      &lb_gps,   x0,             y0);
-	lv_obj_t *p1 = add_panel(ui_DataDisplay, LV_SYMBOL_WIFI,  "Wheel",    &lb_speed, x0+PANEL_W+20,  y0);
+	lv_obj_t *p1 = add_panel(ui_DataDisplay, LV_SYMBOL_WIFI,  "\xE8\xBD\xA6\xE8\xBD\xAE",     &lb_speed, x0+PANEL_W+20,  y0);
 	lv_obj_t *p2 = add_panel(ui_DataDisplay, LV_SYMBOL_SETTINGS, "IMU",   &lb_imu,   x0,             y0+PANEL_H+15);
-	lv_obj_t *p3 = add_panel(ui_DataDisplay, LV_SYMBOL_HOME,  "Mode",     &lb_mode,  x0+PANEL_W+20,  y0+PANEL_H+15);
+	lv_obj_t *p3 = add_panel(ui_DataDisplay, LV_SYMBOL_HOME,  "\xE6\xA8\xA1\xE5\xBC\x8F",     &lb_mode,  x0+PANEL_W+20,  y0+PANEL_H+15);
 
 	add_road_control(ui_DataDisplay, y0 + PANEL_H * 2 + 55);
 

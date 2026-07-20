@@ -30,13 +30,17 @@ typedef enum {
     BT_MODE_REQ_GPS_CLEAR_POINTS
 } BT_ModeReq_t;
 
-/* Road text selected by Bluetooth or the existing LVGL transparent button. */
+/* Shared road display selected by Jetson, Bluetooth, or the LVGL button. */
 typedef uint8_t BT_RoadDisplay_t;
-#define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)0U)
-#define BT_ROAD_DISPLAY_INDOOR           ((BT_RoadDisplay_t)1U)
-#define BT_ROAD_DISPLAY_OUTDOOR_CEMENT   ((BT_RoadDisplay_t)2U)
-#define BT_ROAD_DISPLAY_OUTDOOR_MARBLE   ((BT_RoadDisplay_t)3U)
-#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)4U)
+#define BT_ROAD_DISPLAY_NOT_STARTED      ((BT_RoadDisplay_t)0U)
+#define BT_ROAD_DISPLAY_MARBLE           ((BT_RoadDisplay_t)1U)
+#define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)2U)
+#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)3U)
+
+/* Compatibility aliases for the existing Bluetooth text commands. */
+#define BT_ROAD_DISPLAY_INDOOR           BT_ROAD_DISPLAY_MARBLE
+#define BT_ROAD_DISPLAY_OUTDOOR_MARBLE   BT_ROAD_DISPLAY_MARBLE
+#define BT_ROAD_DISPLAY_OUTDOOR_CEMENT   BT_ROAD_DISPLAY_ASPHALT
 
 /*
  * Keil Watch debug mirror for the Bluetooth receive path.
@@ -97,6 +101,7 @@ uint8_t        BT_IsOnline(void);
 uint8_t        BT_GetKeyState(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
 uint8_t        BT_GetAndClearAckCount(void);
+void           BT_ServicePendingAck(void);
 BT_RoadDisplay_t BT_GetRoadDisplay(void);
 void           BT_SetRoadDisplay(BT_RoadDisplay_t road);
 

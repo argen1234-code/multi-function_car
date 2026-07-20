@@ -1,4 +1,5 @@
 #include "bsp_bluetooth.h"
+#include "usart.h"
 #include <string.h>
 
 #define BT_TOKEN_MAX_LEN      16U
@@ -12,7 +13,7 @@ static volatile uint8_t      bt_key_state = 0U;
 static volatile BT_ModeReq_t bt_mode_req  = BT_MODE_REQ_NONE;
 static volatile uint8_t      bt_ack_count = 0U;
 static volatile uint32_t     bt_last_rx_tick = 0U;
-static volatile BT_RoadDisplay_t bt_road_display = BT_ROAD_DISPLAY_ASPHALT;
+static volatile BT_RoadDisplay_t bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
 static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
 static uint8_t               bt_frame_active = 0U;
@@ -463,7 +464,7 @@ void BT_Init(void)
     bt_mode_req  = BT_MODE_REQ_NONE;
     bt_ack_count = 0U;
     bt_last_rx_tick = 0U;
-    bt_road_display = BT_ROAD_DISPLAY_ASPHALT;
+    bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
     bt_frame_reset();
     bt_debug_reset();
     bt_debug_sync_state();
@@ -682,4 +683,38 @@ uint8_t BT_GetAndClearAckCount(void)
     g_bt_debug.last_ack_count = count;
     bt_debug_sync_state();
     return count;
+}
+
+void BT_ServicePendingAck(void)
+{
+    static const uint8_t ack_msg[] = {'o', 'k', '\r', '\n'};
+    uint8_t sent_count = 0U;
+    uint32_t primask;
+
+    while (bt_ack_count > 0U)
+    {
+        /* Keep the ACK pending when USART1 is temporarily occupied by startup printf output. */
+        if (HAL_UART_Transmit(&huart1, (uint8_t *)ack_msg, sizeof(ack_msg), 10U) != HAL_OK)
+        {
+            break;
+        }
+
+        primask = __get_PRIMASK();
+        __disable_irq();
+        if (bt_ack_count > 0U)
+        {
+            bt_ack_count--;
+        }
+        if (primask == 0U)
+        {
+            __enable_irq();
+        }
+        sent_count++;
+    }
+
+    if (sent_count > 0U)
+    {
+        g_bt_debug.last_ack_count = sent_count;
+    }
+    bt_debug_sync_state();
 }

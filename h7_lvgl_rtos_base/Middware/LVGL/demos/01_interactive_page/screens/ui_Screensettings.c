@@ -47,13 +47,13 @@ static uint8_t settings_item_count = 0U;
 static const char *settings_mode_name(CarMode_t mode)
 {
     switch (mode) {
-    case CAR_MODE_IDLE:    return "No Power";
+    case CAR_MODE_IDLE:    return "\xE6\x9C\xAA\xE4\xB8\x8A\xE7\x94\xB5";
     case CAR_MODE_GPS:     return "GPS";
     case CAR_MODE_GPS_ROS: return "GPS+ROS";
-    case CAR_MODE_REMOTE:  return "WeChat";
-    case CAR_MODE_LINE:    return "ROS Indoor";
-    case CAR_MODE_INDOOR:  return "Bluetooth";
-    case CAR_MODE_VOICE:   return "Voice";
+    case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
+    case CAR_MODE_LINE:    return "ROS\xE5\xAE\xA4\xE5\x86\x85";
+    case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";
+    case CAR_MODE_VOICE:   return "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6";
     default:               return "--";
     }
 }
@@ -178,7 +178,7 @@ static void settings_add_slider(lv_obj_t *parent, const char *name, uint8_t type
     title = lv_label_create(row);
     lv_label_set_text(title, name);
     lv_obj_set_style_text_color(title, lv_color_hex(UI_COLOR_TEXT), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &ui_font_CN14, 0);
     lv_obj_set_pos(title, 16, 12);
 
     item->slider = lv_slider_create(row);
@@ -225,6 +225,7 @@ static void settings_add_mode_button(lv_obj_t *parent, const char *name, CarMode
 
     label = lv_label_create(btn);
     lv_label_set_text(label, name);
+    lv_obj_set_style_text_font(label, &ui_font_CN14, 0);
     lv_obj_center(label);
 }
 
@@ -243,14 +244,14 @@ static void settings_refresh_status(void)
                   (HAL_GetTick() - data.gps_last_update_tick) <= 3000U) ? 1U : 0U;
 
     snprintf(status, sizeof(status),
-             "Mode: %s\n"
-             "GPS: %s  Lat %.5f  Lon %.5f  Sat %d\n"
-             "Time: %02u:%02u:%02u\n"
-             "IMU Yaw: %.1f  Mag: %s\n"
-             "Wheel rpm: %.1f %.1f %.1f %.1f\n"
-             "Init: %s",
+             "\xE6\xA8\xA1\xE5\xBC\x8F: %s\n"
+             "GPS: %s  \xE7\xBA\xAC\xE5\xBA\xA6 %.5f  \xE7\xBB\x8F\xE5\xBA\xA6 %.5f  \xE5\x8D\xAB\xE6\x98\x9F %d\n"
+             "\xE6\x97\xB6\xE9\x97\xB4: %02u:%02u:%02u\n"
+             "IMU\xE8\x88\xAA\xE5\x90\x91: %.1f  \xE7\xA3\x81\xE5\x8A\x9B\xE8\xAE\xA1: %s\n"
+             "\xE8\xBD\xA6\xE8\xBD\xAE\xE8\xBD\xAC\xE9\x80\x9F: %.1f %.1f %.1f %.1f rpm\n"
+             "\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96: %s",
              settings_mode_name(data.mode),
-             gps_online ? "ONLINE" : "OFFLINE",
+             gps_online ? "\xE5\x9C\xA8\xE7\xBA\xBF" : "\xE7\xA6\xBB\xE7\xBA\xBF",
              data.gps_lat,
              data.gps_lon,
              data.gps_sats,
@@ -258,7 +259,7 @@ static void settings_refresh_status(void)
              (unsigned)data.gps_minute,
              (unsigned)data.gps_second,
              data.ins_yaw,
-             data.qmc_calibrating ? "CALIB" : "READY",
+             data.qmc_calibrating ? "\xE6\xA0\xA1\xE5\x87\x86\xE4\xB8\xAD" : "\xE5\xB0\xB1\xE7\xBB\xAA",
              (float)data.motor_speed[0],
              (float)data.motor_speed[1],
              (float)data.motor_speed[2],
@@ -304,9 +305,9 @@ void ui_Screensettings_screen_init(void)
     ui_Image1 = NULL;
 
     title = lv_label_create(ui_Screensettings);
-    lv_label_set_text(title, "System Settings");
+    lv_label_set_text(title, "\xE7\xB3\xBB\xE7\xBB\x9F\xE8\xAE\xBE\xE7\xBD\xAE");
     lv_obj_set_style_text_color(title, lv_color_hex(UI_COLOR_BLUE_DARK), 0);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(title, &ui_font_CN14, 0);
     lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 8);
 
     back = lv_btn_create(ui_Screensettings);
@@ -316,47 +317,49 @@ void ui_Screensettings_screen_init(void)
     ui_apply_raised_button(back);
     lv_obj_add_event_cb(back, ui_event_Screensettings, LV_EVENT_CLICKED, NULL);
     back_label = lv_label_create(back);
-    lv_label_set_text(back_label, "Back");
+    lv_label_set_text(back_label, "\xE8\xBF\x94\xE5\x9B\x9E");
+    lv_obj_set_style_text_font(back_label, &ui_font_CN14, 0);
     lv_obj_center(back_label);
 
     tv = lv_tabview_create(ui_Screensettings, LV_DIR_TOP, 34);
     lv_obj_set_size(tv, 980, 540);
     lv_obj_align(tv, LV_ALIGN_BOTTOM_MID, 0, -8);
     ui_apply_raised_panel(tv);
+	lv_obj_set_style_text_font(lv_tabview_get_tab_btns(tv), &ui_font_CN14, 0);
 
-    tab_gain = settings_make_tab(tv, "Gain");
-    tab_remote = settings_make_tab(tv, "Remote");
-    tab_mode = settings_make_tab(tv, "Mode");
+    tab_gain = settings_make_tab(tv, "\xE5\xA2\x9E\xE7\x9B\x8A");
+    tab_remote = settings_make_tab(tv, "\xE9\x81\xA5\xE6\x8E\xA7");
+    tab_mode = settings_make_tab(tv, "\xE6\xA8\xA1\xE5\xBC\x8F");
     tab_pid = settings_make_tab(tv, "PID");
-    tab_status = settings_make_tab(tv, "Status");
+    tab_status = settings_make_tab(tv, "\xE7\x8A\xB6\xE6\x80\x81");
 
-    settings_add_slider(tab_gain, "GPS Nav Gain", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_GPS, 0.0f, 2.0f, 100U);
-    settings_add_slider(tab_gain, "Bluetooth Gain", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_INDOOR, 0.0f, 2.0f, 100U);
-    settings_add_slider(tab_gain, "WeChat Gain", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_REMOTE, 0.0f, 2.0f, 100U);
-    settings_add_slider(tab_gain, "ROS Nav Gain", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_LINE, 0.0f, 2.0f, 100U);
-    settings_add_slider(tab_gain, "Voice Gain", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_VOICE, 0.0f, 2.0f, 100U);
+    settings_add_slider(tab_gain, "GPS\xE5\xAF\xBC\xE8\x88\xAA\xE5\xA2\x9E\xE7\x9B\x8A", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_GPS, 0.0f, 2.0f, 100U);
+    settings_add_slider(tab_gain, "\xE8\x93\x9D\xE7\x89\x99\xE5\xA2\x9E\xE7\x9B\x8A", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_INDOOR, 0.0f, 2.0f, 100U);
+    settings_add_slider(tab_gain, "\xE5\xBE\xAE\xE4\xBF\xA1\xE5\xA2\x9E\xE7\x9B\x8A", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_REMOTE, 0.0f, 2.0f, 100U);
+    settings_add_slider(tab_gain, "ROS\xE5\xAF\xBC\xE8\x88\xAA\xE5\xA2\x9E\xE7\x9B\x8A", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_LINE, 0.0f, 2.0f, 100U);
+    settings_add_slider(tab_gain, "\xE8\xAF\xAD\xE9\x9F\xB3\xE5\xA2\x9E\xE7\x9B\x8A", SETTINGS_TYPE_GAIN, CHASSIS_GAIN_PARAM_VOICE, 0.0f, 2.0f, 100U);
 
-    settings_add_slider(tab_remote, "BT Linear Speed", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_BT_SPEED, 0.0f, 200.0f, 1U);
-    settings_add_slider(tab_remote, "BT Angular Speed", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_BT_WZ, 0.0f, 100.0f, 1U);
-    settings_add_slider(tab_remote, "WeChat Speed Scale", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_WECHAT_VX_SCALE, 0.0f, 200.0f, 1U);
-    settings_add_slider(tab_remote, "ROS Max Speed", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_ROS_MAX_SPEED, 0.0f, 150.0f, 1U);
+    settings_add_slider(tab_remote, "\xE8\x93\x9D\xE7\x89\x99\xE7\xBA\xBF\xE9\x80\x9F\xE5\xBA\xA6", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_BT_SPEED, 0.0f, 200.0f, 1U);
+    settings_add_slider(tab_remote, "\xE8\x93\x9D\xE7\x89\x99\xE8\xA7\x92\xE9\x80\x9F\xE5\xBA\xA6", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_BT_WZ, 0.0f, 100.0f, 1U);
+    settings_add_slider(tab_remote, "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x80\x9F\xE5\xBA\xA6\xE6\xAF\x94\xE4\xBE\x8B", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_WECHAT_VX_SCALE, 0.0f, 200.0f, 1U);
+    settings_add_slider(tab_remote, "ROS\xE6\x9C\x80\xE5\xA4\xA7\xE9\x80\x9F\xE5\xBA\xA6", SETTINGS_TYPE_REMOTE, CHASSIS_REMOTE_PARAM_ROS_MAX_SPEED, 0.0f, 150.0f, 1U);
 
-    settings_add_slider(tab_pid, "Speed KP", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KP, 0.0f, 3.0f, 100U);
-    settings_add_slider(tab_pid, "Speed KI", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KI, 0.0f, 1.0f, 100U);
-    settings_add_slider(tab_pid, "Speed KD", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KD, 0.0f, 1.0f, 100U);
-    settings_add_slider(tab_pid, "PID Max Out", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_MAX_OUT, 0.0f, 300.0f, 1U);
+    settings_add_slider(tab_pid, "\xE9\x80\x9F\xE5\xBA\xA6 KP", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KP, 0.0f, 3.0f, 100U);
+    settings_add_slider(tab_pid, "\xE9\x80\x9F\xE5\xBA\xA6 KI", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KI, 0.0f, 1.0f, 100U);
+    settings_add_slider(tab_pid, "\xE9\x80\x9F\xE5\xBA\xA6 KD", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KD, 0.0f, 1.0f, 100U);
+    settings_add_slider(tab_pid, "PID\xE6\x9C\x80\xE5\xA4\xA7\xE8\xBE\x93\xE5\x87\xBA", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_MAX_OUT, 0.0f, 300.0f, 1U);
 
     settings_add_mode_button(tab_mode, "GPS", CAR_MODE_GPS, 40, 30);
     settings_add_mode_button(tab_mode, "GPS+ROS", CAR_MODE_GPS_ROS, 200, 30);
-    settings_add_mode_button(tab_mode, "Bluetooth", CAR_MODE_INDOOR, 360, 30);
-    settings_add_mode_button(tab_mode, "WeChat", CAR_MODE_REMOTE, 520, 30);
-    settings_add_mode_button(tab_mode, "ROS Indoor", CAR_MODE_LINE, 680, 30);
-    settings_add_mode_button(tab_mode, "Voice", CAR_MODE_VOICE, 40, 92);
+    settings_add_mode_button(tab_mode, "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_INDOOR, 360, 30);
+    settings_add_mode_button(tab_mode, "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_REMOTE, 520, 30);
+    settings_add_mode_button(tab_mode, "ROS\xE5\xAE\xA4\xE5\x86\x85", CAR_MODE_LINE, 680, 30);
+    settings_add_mode_button(tab_mode, "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6", CAR_MODE_VOICE, 40, 92);
 
     settings_status_label = lv_label_create(tab_status);
     lv_obj_set_width(settings_status_label, 880);
     lv_obj_set_style_text_color(settings_status_label, lv_color_hex(UI_COLOR_TEXT), 0);
-    lv_obj_set_style_text_font(settings_status_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(settings_status_label, &ui_font_CN14, 0);
     lv_obj_align(settings_status_label, LV_ALIGN_TOP_LEFT, 18, 20);
     settings_refresh_status();
 

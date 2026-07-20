@@ -58,6 +58,9 @@ LV_FONT_DECLARE(ui_font_Font2);
 LV_FONT_DECLARE(ui_font_Font3);
 LV_FONT_DECLARE(ui_font_Font4);
 LV_FONT_DECLARE(ui_font_Font5);
+LV_FONT_DECLARE(ui_font_Road);
+LV_FONT_DECLARE(ui_font_CN14);
+LV_FONT_DECLARE(ui_font_CN64);
 
 // UI INIT
 void ui_init(void);

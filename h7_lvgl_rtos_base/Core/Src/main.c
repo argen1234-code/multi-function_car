@@ -12,6 +12,8 @@
 #include "i2c.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "bsp_uart.h"
+#include "bsp_bluetooth.h"
 
 #include "lvgl.h"
 #include "lv_port_disp_template.h"
@@ -135,6 +137,8 @@ int main(void)
 		MX_TIM2_Init();           // Encoder FL
 		MX_TIM4_Init();           // Encoder RL
 		MX_USART1_UART_Init();    // Bluetooth
+		BT_Init();
+		uart_init(&huart1, UART_DMA_ToIdle_RX); /* Start Bluetooth RX before RTOS startup. */
 		MX_USART2_UART_Init();    // GPS
 		MX_USART6_UART_Init();    // JY901S IMU
 	//MX_UART4_Init();   // UART4 disabled: PC10 freed for SDMMC1_D2

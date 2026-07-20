@@ -70,6 +70,13 @@ static void uart_dcache_clean(uint8_t *buf, uint32_t len)
 	SCB_CleanDCache_by_Addr((uint32_t *)aligned_addr, (int32_t)aligned_len);
 }
 
+static void uart1_clear_rx_error(void)
+{
+	__HAL_UART_CLEAR_FLAG(&huart1, UART_CLEAR_OREF | UART_CLEAR_NEF | UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_IDLEF);
+	__HAL_UART_SEND_REQ(&huart1, UART_RXDATA_FLUSH_REQUEST);
+	huart1.ErrorCode = HAL_UART_ERROR_NONE;
+}
+
 static void uart6_clear_rx_error(void)
 {
 	__HAL_UART_CLEAR_FLAG(&huart6, UART_CLEAR_OREF | UART_CLEAR_NEF | UART_CLEAR_PEF | UART_CLEAR_FEF | UART_CLEAR_IDLEF);
@@ -88,6 +95,7 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 	if (huart == &huart1)
 	{
 		uart1_rx_mode_temp = uart_rx_mode;
+		uart1_clear_rx_error();
 
 		if (uart_rx_mode == UART_DMA_RX)
 		{
@@ -97,7 +105,12 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 		else if (uart_rx_mode == UART_DMA_ToIdle_RX)
 		{
 			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
-			HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+			if (HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE) != HAL_OK)
+			{
+				uart1_clear_rx_error();
+				uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
+				(void)HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+			}
 		}
 		else if (uart_rx_mode == UART_IT_RX)
 		{
@@ -172,7 +185,30 @@ void uart_init(UART_HandleTypeDef *huart, uint8_t uart_rx_mode)
 //����usart6�Ĵ����������������ż����ORE����
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-	if (huart == &huart6)
+	if (huart == &huart1)
+	{
+		uart1_clear_rx_error();
+
+		if (uart1_rx_mode_temp == UART_IT_RX)
+		{
+			HAL_UART_Receive_IT(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart1_rx_mode_temp == UART_DMA_RX)
+		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
+			HAL_UART_Receive_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart1_rx_mode_temp == UART_IT_ToIdle_RX)
+		{
+			HAL_UARTEx_ReceiveToIdle_IT(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+		}
+		else if (uart1_rx_mode_temp == UART_DMA_ToIdle_RX)
+		{
+			uart_dcache_invalidate(uart1_rx_data, UART_RX_BUFFER_SIZE);
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart1_rx_data, UART_RX_BUFFER_SIZE);
+		}
+	}
+	else if (huart == &huart6)
 	{
 		uart6_clear_rx_error();
 

@@ -3471,6 +3471,21 @@
               <FilePath>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_Font2.c</FilePath>
             </File>
             <File>
+              <FileName>ui_font_Road.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_Road.c</FilePath>
+            </File>
+            <File>
+              <FileName>ui_font_CN14.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_CN14.c</FilePath>
+            </File>
+            <File>
+              <FileName>ui_font_CN64.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_CN64.c</FilePath>
+            </File>
+            <File>
               <FileName>ui_font_Font3.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_Font3.c</FilePath>

@@ -164,8 +164,9 @@ void ui_FileManager_screen_init(void)
 	lv_obj_set_y(g_title, 5);
 
 	lv_obj_t *hint = lv_label_create(ui_FileManager);
-	lv_label_set_text(hint, "Swipe to scroll | Tap screen to go back");
+	lv_label_set_text(hint, "\xE6\xBB\x91\xE5\x8A\xA8\xE6\xB5\x8F\xE8\xA7\x88 | \xE7\x82\xB9\xE5\x87\xBB\xE5\xB1\x8F\xE5\xB9\x95\xE8\xBF\x94\xE5\x9B\x9E");
 	lv_obj_set_style_text_color(hint, lv_color_hex(UI_COLOR_TEXT_MUTED), LV_PART_MAIN);
+	lv_obj_set_style_text_font(hint, &ui_font_CN14, LV_PART_MAIN);
 	lv_obj_set_align(hint, LV_ALIGN_BOTTOM_MID);
 	lv_obj_set_y(hint, -10);
 

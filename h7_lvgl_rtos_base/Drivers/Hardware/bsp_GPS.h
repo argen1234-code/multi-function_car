@@ -313,6 +313,7 @@ extern volatile GPS_Debug_t g_gps_debug;
  * context (uses osDelay).
  */
 void GPS_Init(void);
+void GPS_InitBackgroundHook(void);
 
 /**
  * @brief  Send an ASCII command string to the GPS module over UART2.

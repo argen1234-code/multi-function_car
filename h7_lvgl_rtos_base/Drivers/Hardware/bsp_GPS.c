@@ -201,6 +201,7 @@ void GPS_Init(void)
 	while (ucConfigStep)
 	{
 		osDelay(500);                        /* Wait 500 ms between commands */
+		GPS_InitBackgroundHook();             /* Allow lightweight startup services while waiting. */
 		switch(ucConfigStep++)
 		{
 			case 1:break;                    /* Step 1: idle / sync start */
@@ -217,6 +218,7 @@ void GPS_Init(void)
 		}
 	}
 	osDelay(500);                            /* Final settling delay */
+	GPS_InitBackgroundHook();
 }
 
 /**
@@ -465,4 +467,7 @@ void GPS_RxPro_HAL(uint8_t* pBuf, uint16_t Size)
 		}
 	        i++;
 	}
+}
+__weak void GPS_InitBackgroundHook(void)
+{
 }

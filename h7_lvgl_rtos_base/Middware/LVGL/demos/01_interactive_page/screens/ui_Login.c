@@ -34,12 +34,12 @@ void ui_event_Login(lv_event_t *e)
 	if (code == LV_EVENT_CLICKED) {
 		const char *pwd = lv_textarea_get_text(ui_Login_PwdTA);
 		if (strcmp(pwd, "qmq") == 0) {
-			lv_label_set_text(msg_label, "OK! Loading...");
+			lv_label_set_text(msg_label, "\xE5\xAF\x86\xE7\xA0\x81\xE6\xAD\xA3\xE7\xA1\xAE\xEF\xBC\x8C\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x8A\xA0\xE8\xBD\xBD...");
 			lv_obj_clear_flag(msg_label, LV_OBJ_FLAG_HIDDEN);
 			lv_obj_set_style_text_color(msg_label, lv_color_hex(UI_COLOR_CYAN), LV_PART_MAIN);
 			_ui_screen_load(ui_Screenmain, LV_SCR_LOAD_ANIM_MOVE_RIGHT, 500, 0);
 		} else {
-			lv_label_set_text(msg_label, "Wrong password!");
+			lv_label_set_text(msg_label, "\xE5\xAF\x86\xE7\xA0\x81\xE9\x94\x99\xE8\xAF\xAF\xEF\xBC\x81");
 			lv_obj_clear_flag(msg_label, LV_OBJ_FLAG_HIDDEN);
 		}
 	}
@@ -77,9 +77,9 @@ void ui_Login_screen_init(void)
 
 	/* ---- Title ---- */
 	lv_obj_t *title = lv_label_create(ui_Login);
-	lv_label_set_text(title, "Multi-Function Car");
+	lv_label_set_text(title, "\xE5\xA4\x9A\xE5\x8A\x9F\xE8\x83\xBD\xE5\xB0\x8F\xE8\xBD\xA6");
 	lv_obj_set_style_text_color(title, lv_color_hex(UI_COLOR_CYAN_DARK), LV_PART_MAIN);
-	lv_obj_set_style_text_font(title, &ui_font_FontTitle, LV_PART_MAIN);
+	lv_obj_set_style_text_font(title, &ui_font_CN64, LV_PART_MAIN);
 	lv_obj_set_align(title, LV_ALIGN_TOP_MID);
 	lv_obj_set_y(title, 80);
 
@@ -95,7 +95,8 @@ void ui_Login_screen_init(void)
 	lv_obj_set_style_text_color(user_ta, lv_color_hex(UI_COLOR_TEXT), LV_PART_MAIN);
 
 	lv_obj_t *user_lbl = lv_label_create(ui_Login);
-	lv_label_set_text(user_lbl, "Username");
+	lv_label_set_text(user_lbl, "\xE7\x94\xA8\xE6\x88\xB7\xE5\x90\x8D");
+	lv_obj_set_style_text_font(user_lbl, &ui_font_CN14, LV_PART_MAIN);
 	lv_obj_set_style_text_color(user_lbl, lv_color_hex(UI_COLOR_TEXT_MUTED), LV_PART_MAIN);
 	lv_obj_align_to(user_lbl, user_ta, LV_ALIGN_OUT_TOP_LEFT, 0, -5);
 
@@ -113,7 +114,8 @@ void ui_Login_screen_init(void)
 	lv_obj_add_event_cb(ui_Login_PwdTA, pwd_ta_event_cb, LV_EVENT_CLICKED, NULL);
 
 	lv_obj_t *pwd_lbl = lv_label_create(ui_Login);
-	lv_label_set_text(pwd_lbl, "Password");
+	lv_label_set_text(pwd_lbl, "\xE5\xAF\x86\xE7\xA0\x81");
+	lv_obj_set_style_text_font(pwd_lbl, &ui_font_CN14, LV_PART_MAIN);
 	lv_obj_set_style_text_color(pwd_lbl, lv_color_hex(UI_COLOR_TEXT_MUTED), LV_PART_MAIN);
 	lv_obj_align_to(pwd_lbl, ui_Login_PwdTA, LV_ALIGN_OUT_TOP_LEFT, 0, -5);
 
@@ -127,7 +129,8 @@ void ui_Login_screen_init(void)
 	lv_obj_set_style_shadow_width(btn, 0, LV_PART_MAIN);
 
 	lv_obj_t *btn_lbl = lv_label_create(btn);
-	lv_label_set_text(btn_lbl, "Login");
+	lv_label_set_text(btn_lbl, "\xE7\x99\xBB\xE5\xBD\x95");
+	lv_obj_set_style_text_font(btn_lbl, &ui_font_CN14, LV_PART_MAIN);
 	lv_obj_set_style_text_color(btn_lbl, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN);
 	lv_obj_center(btn_lbl);
 
@@ -137,6 +140,7 @@ void ui_Login_screen_init(void)
 	/* ---- Error message label (hidden) ---- */
 	msg_label = lv_label_create(ui_Login);
 	lv_label_set_text(msg_label, "");
+	lv_obj_set_style_text_font(msg_label, &ui_font_CN14, LV_PART_MAIN);
 	lv_obj_set_style_text_color(msg_label, lv_color_hex(UI_COLOR_DANGER), LV_PART_MAIN);
 	lv_obj_set_align(msg_label, LV_ALIGN_CENTER);
 	lv_obj_set_y(msg_label, 140);

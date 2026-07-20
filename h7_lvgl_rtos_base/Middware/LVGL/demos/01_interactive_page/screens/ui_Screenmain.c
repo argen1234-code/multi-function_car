@@ -42,7 +42,7 @@ static uint8_t screenmain_gps_time_online(const ChassisTelemetry_t *data)
 
 static void screenmain_update_time(void)
 {
-    static const char *week_names[7] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static const char *week_names[7] = {"\xE6\x98\x9F\xE6\x9C\x9F\xE6\x97\xA5", "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xB8\x80", "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xBA\x8C", "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xB8\x89", "\xE6\x98\x9F\xE6\x9C\x9F\xE5\x9B\x9B", "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xBA\x94", "\xE6\x98\x9F\xE6\x9C\x9F\xE5\x85\xAD"};
     char date_buf[40];
     char time_buf[16];
     char status_buf[64];
@@ -70,7 +70,7 @@ static void screenmain_update_time(void)
     }
     else
     {
-        snprintf(date_buf, sizeof(date_buf), "GPS Time --");
+        snprintf(date_buf, sizeof(date_buf), "GPS\xE6\x97\xB6\xE9\x97\xB4 --");
         snprintf(time_buf, sizeof(time_buf), "--:--:--");
     }
 
@@ -143,7 +143,7 @@ void ui_Screenmain_screen_init(void)
     lv_obj_set_x(ui_Label1, -391);
     lv_obj_set_y(ui_Label1, 0);
     lv_obj_set_align(ui_Label1, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_Label1, "GPS Time --");
+    lv_label_set_text(ui_Label1, "GPS\xE6\x97\xB6\xE9\x97\xB4 --");
     lv_obj_set_style_text_color(ui_Label1, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_Label1, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_Label1, &ui_font_Font1, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -164,11 +164,11 @@ void ui_Screenmain_screen_init(void)
     lv_obj_set_x(ui_LabelStatus, 0);
     lv_obj_set_y(ui_LabelStatus, 0);
     lv_obj_set_align(ui_LabelStatus, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_LabelStatus, "Init pending");
+    lv_label_set_text(ui_LabelStatus, "\xE7\xAD\x89\xE5\xBE\x85\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96");
     lv_obj_set_style_text_color(ui_LabelStatus, lv_color_hex(UI_COLOR_BG), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_LabelStatus, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_align(ui_LabelStatus, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_LabelStatus, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_LabelStatus, &ui_font_CN14, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_Panel4 = lv_obj_create(ui_Screenmain);
     lv_obj_set_width(ui_Panel4, 716);
