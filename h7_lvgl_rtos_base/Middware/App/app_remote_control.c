@@ -66,7 +66,7 @@ void Remote_ROS_Update(chassis_move_t *chassis)
     float out_wz = chassis->cmd_vel.vz * vz_scale;
 
     if (out_vx >  max_vx) out_vx =  max_vx;
-    if (out_vx < -max_vx) out_vx = -max_vx;
+    if (out_vx < 0.0f)    out_vx = 0.0f;
     if (out_wz >  max_wz) out_wz =  max_wz;
     if (out_wz < -max_wz) out_wz = -max_wz;
 

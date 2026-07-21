@@ -403,7 +403,7 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
         out_vx = nav->distance_error * Kp_dist;
     }
     if (out_vx >  vx_limit) out_vx =  vx_limit;
-    if (out_vx < -vx_limit) out_vx = -vx_limit;
+    if (out_vx < 0.0f)     out_vx = 0.0f;
 
     /* 横向: 融合模式不使用蟹行, 仅向前 */
     float out_vy = 0.0f;
