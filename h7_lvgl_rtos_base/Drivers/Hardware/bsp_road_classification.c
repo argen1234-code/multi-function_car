@@ -38,7 +38,17 @@
  * 此常量对应本次 ZIP 内导出的 NanoEdgeAI.h。运行时核对 ID 可以阻止“只替换了
  * .a 或只替换了 .h”的半更新状态；遇到这种情况时 BSP 进入 ERROR，但底盘照常跑。
  */
-#define BSP_ROAD_CLASSIFICATION_EXPECTED_MODEL_ID "6a5b7983ae7a6f0e8fca6ba3"
+#define BSP_ROAD_CLASSIFICATION_EXPECTED_MODEL_ID "6a5fc92cfd819c3c7aa16876"
+
+/*
+ * NanoEdge 导出包保留了训练数据集名称。它们只用于校验 .h 与 .a 确实来自同一
+ * 个 ZIP；BSP 对上层公开的类别名仍是简洁的 outdoor / indoor。
+ */
+static const char * const s_expected_model_class_names[BSP_ROAD_CLASSIFICATION_CLASS_COUNT] =
+{
+    "jy901s_nanoedge_scu_outdoor",
+    "jy901s_nanoedge_live_indoor2"
+};
 
 /*
  * NanoEdge 输入缓冲的布局必须是“时间优先”：
@@ -277,7 +287,7 @@ uint8_t BSP_RoadClassification_Init(void)
 
     /*
      * 二次校验可防止日后误替换为其它 NanoEdge 导出包后发生缓冲区越界或类别错标。
-     * 本次模型固定为 32 样本、6 轴、3 类，且模型 ID 必须与导入的 ZIP 一致。
+     * 本次模型固定为 32 样本、6 轴、2 类，且模型 ID 必须与导入的 ZIP 一致。
      */
     model_id = neai_get_id();
     if ((neai_get_input_signal_size() != (int)BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES) ||
@@ -291,15 +301,14 @@ uint8_t BSP_RoadClassification_Init(void)
     }
 
     /*
-     * 类名也是模型契约的一部分。这样即使某个未来模型同样恰好是“32 x 6、3 类”，
-     * 也不会被错误解释成水泥/室内。NanoEdge 原始类型只在本 .c 内出现。
+     * 原始类名也是模型契约的一部分。这样即使某个未来模型同样恰好是
+     * “32 x 6、2 类”，也不会被错误解释成当前室外/室内模型。
      */
     for (i = 0U; i < BSP_ROAD_CLASSIFICATION_CLASS_COUNT; i++)
     {
         model_class_name = neai_get_class_name((int)i);
         if ((model_class_name == NULL) ||
-            (strcmp(model_class_name,
-                    BSP_RoadClassification_GetClassName((BSP_RoadClassificationClass_t)i)) != 0))
+            (strcmp(model_class_name, s_expected_model_class_names[i]) != 0))
         {
             BSP_RoadClassification_PublishError((int32_t)NEAI_INVALID_PARAM);
             return 0U;
@@ -459,12 +468,10 @@ const char *BSP_RoadClassification_GetClassName(BSP_RoadClassificationClass_t cl
 {
     switch (class_id)
     {
-        case BSP_ROAD_CLASS_INDOORS:
-            return "indoors";
-        case BSP_ROAD_CLASS_CEMENT:
-            return "cement";
-        case BSP_ROAD_CLASS_ASPHALT:
-            return "asphalt";
+        case BSP_ROAD_CLASS_OUTDOOR:
+            return "outdoor";
+        case BSP_ROAD_CLASS_INDOOR:
+            return "indoor";
         default:
             return "unknown";
     }

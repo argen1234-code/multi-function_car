@@ -9,13 +9,13 @@ extern "C" {
 #endif
 
 /*
- * NanoEdge 导出模型（ID=6a5b7983ae7a6f0e8fca6ba3）的固定输入维度：
+ * NanoEdge 导出模型（ID=6a5fc92cfd819c3c7aa16876）的固定输入维度：
  * 连续 32 帧、每帧 6 个 IMU 通道。这里的常量必须和工程内 NanoEdgeAI.h
  * 配套使用；运行时还会再次读取库的 getter 校验，防止以后误替换模型。
  */
 #define BSP_ROAD_CLASSIFICATION_WINDOW_SAMPLES   32U
 #define BSP_ROAD_CLASSIFICATION_AXIS_COUNT       6U
-#define BSP_ROAD_CLASSIFICATION_CLASS_COUNT      3U
+#define BSP_ROAD_CLASSIFICATION_CLASS_COUNT      2U
 #define BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS 4U
 #define BSP_ROAD_CLASSIFICATION_CLASS_NAME_LENGTH 20U
 
@@ -26,22 +26,22 @@ extern "C" {
 #define BSP_ROAD_CLASSIFICATION_MAX_SAMPLE_GAP_MS 250U
 
 /*
- * 本次 ZIP 中的模型共有三类，且顺序已由 metadata、DLL 模拟器和
- * neai_get_class_name() 三处交叉核对：0=indoors、1=cement、2=asphalt。
+ * 本次 ZIP 中的模型共有两类，且顺序已由 metadata、NanoEdgeAI.h 和 DLL
+ * getter 三处交叉核对：0=outdoor、1=indoor。导出包里的原始长标签只在 .c
+ * 文件中用于模型契约校验，对上层继续公开简洁、稳定的语义类别。
  *
  * 这里仍故意使用定宽整数而非 C enum：虽然新库与工程均使用短 enum，公开快照
  * 仍不应依赖编译器的枚举尺寸。这样以后再次替换模型时，上层模块和 Keil Watch
  * 看到的结构体布局不会跟随 NanoEdge ABI 变化。
  */
 typedef int8_t BSP_RoadClassificationClass_t;
-#define BSP_ROAD_CLASS_INDOORS         ((BSP_RoadClassificationClass_t)0)
-#define BSP_ROAD_CLASS_CEMENT          ((BSP_RoadClassificationClass_t)1)
-#define BSP_ROAD_CLASS_ASPHALT         ((BSP_RoadClassificationClass_t)2)
+#define BSP_ROAD_CLASS_OUTDOOR         ((BSP_RoadClassificationClass_t)0)
+#define BSP_ROAD_CLASS_INDOOR          ((BSP_RoadClassificationClass_t)1)
 #define BSP_ROAD_CLASS_UNKNOWN         ((BSP_RoadClassificationClass_t)-1)
 
-/* 保留现有源码使用的旧宏名；其值跟随新模型对应类别，不改变调用方式。 */
-#define BSP_ROAD_CLASS_INDOOR          BSP_ROAD_CLASS_INDOORS
-#define BSP_ROAD_CLASS_OUTDOOR_CEMENT  BSP_ROAD_CLASS_CEMENT
+/* 保留复数形式的兼容宏，避免上层调试表达式因命名变化失效。 */
+#define BSP_ROAD_CLASS_OUTDOORS        BSP_ROAD_CLASS_OUTDOOR
+#define BSP_ROAD_CLASS_INDOORS         BSP_ROAD_CLASS_INDOOR
 
 /*
  * BSP 对上层公开的运行状态，同样使用定宽整数，避免 NanoEdge enum ABI 或本文件
@@ -59,7 +59,7 @@ typedef uint8_t BSP_RoadClassificationState_t;
  * 结果。class_name 是可直接读取的稳定英文类别名，不要求上层再接触 NanoEdge API。
  *
  * probabilities 仍保留原模型时代的 4 个槽位，以保持旧调试表达式和旧结构字段
- * 偏移可用；新模型实际有 3 类，因此下标 0~2 有效，下标 3 永远写成 0.0f。
+ * 偏移可用；新模型实际有 2 类，因此下标 0~1 有效，下标 2~3 永远写成 0.0f。
  */
 typedef struct
 {
@@ -91,7 +91,7 @@ typedef struct BSP_RoadClassificationDebug_s
 
     uint8_t model_initialized;  /* 1：NanoEdge 初始化和模型维度校验均成功。 */
     uint8_t state;              /* 0 未初始化，1 预热，2 READY，3 错误。 */
-    int8_t class_id;            /* 0 室内，1 水泥，2 沥青，-1 未知。 */
+    int8_t class_id;            /* 0 室外，1 室内，-1 未知。 */
     uint8_t collected_samples;  /* 已收集的新 IMU 帧数；满 32 帧即执行一次推理。 */
     uint8_t has_result;         /* 1：当前快照包含一次有效分类结果；预热/错误时为 0。 */
     uint8_t reserved[3];        /* 预留并保持 32 位字段对齐，调试时无需关注。 */
@@ -104,8 +104,8 @@ typedef struct BSP_RoadClassificationDebug_s
     float latest_imu_sample[BSP_ROAD_CLASSIFICATION_AXIS_COUNT];
 
     /*
-     * 下标 0~2 依次是 indoors、cement、asphalt。
-     * 下标 3 是为原调试窗口保留的兼容槽，始终为 0.0f。保留四槽也使
+     * 下标 0~1 依次是 outdoor、indoor。
+     * 下标 2~3 是为原调试窗口保留的兼容槽，始终为 0.0f。保留四槽也使
      * class_name 及其之前所有成员相对原 BSP 的结构偏移保持不变。
      */
     float probabilities[BSP_ROAD_CLASSIFICATION_PROBABILITY_SLOTS];

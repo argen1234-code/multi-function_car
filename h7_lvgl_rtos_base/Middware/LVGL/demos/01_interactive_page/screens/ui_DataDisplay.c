@@ -26,6 +26,7 @@
 #define ROAD_TEXT_INDOORS      "\xE5\xAE\xA4\xE5\x86\x85\xE5\x9C\xB0\xE9\x9D\xA2"
 #define ROAD_TEXT_CEMENT       "\xE6\xB0\xB4\xE6\xB3\xA5\xE8\xB7\xAF"
 #define ROAD_TEXT_ASPHALT      "\xE6\x9F\x8F\xE6\xB2\xB9\xE8\xB7\xAF"
+#define ROAD_TEXT_OUTDOORS     "\xE5\xAE\xA4\xE5\xA4\x96\xE5\x9C\xB0\xE9\x9D\xA2"
 
 lv_obj_t *ui_DataDisplay = NULL;
 
@@ -33,7 +34,8 @@ static const char * const road_conditions[] = {
 	ROAD_TEXT_NOT_STARTED,
 	ROAD_TEXT_INDOORS,
 	ROAD_TEXT_CEMENT,
-	ROAD_TEXT_ASPHALT
+	ROAD_TEXT_ASPHALT,
+	ROAD_TEXT_OUTDOORS
 };
 
 static lv_obj_t *lb_gps = NULL, *lb_speed = NULL, *lb_imu = NULL, *lb_mode = NULL;
@@ -137,9 +139,8 @@ static const char *road_condition_get(void)
 	BSP_RoadClassification_GetResult(&result);
 	if (result.state == BSP_ROAD_CLASSIFICATION_READY && result.has_result) {
 		switch (result.class_id) {
-		case BSP_ROAD_CLASS_INDOORS: display = BT_ROAD_DISPLAY_INDOORS; break;
-		case BSP_ROAD_CLASS_CEMENT:  display = BT_ROAD_DISPLAY_CEMENT;  break;
-		case BSP_ROAD_CLASS_ASPHALT: display = BT_ROAD_DISPLAY_ASPHALT; break;
+		case BSP_ROAD_CLASS_OUTDOOR: display = BT_ROAD_DISPLAY_OUTDOORS; break;
+		case BSP_ROAD_CLASS_INDOOR:  display = BT_ROAD_DISPLAY_INDOORS;  break;
 		default:                     display = BT_ROAD_DISPLAY_NOT_STARTED; break;
 		}
 

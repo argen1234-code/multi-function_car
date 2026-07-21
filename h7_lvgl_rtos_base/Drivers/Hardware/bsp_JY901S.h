@@ -14,6 +14,8 @@ extern "C" {
 #define JY901S_UPDATE_MAG    0x08U
 #define JY901S_UPDATE_TEMP   0x10U
 
+#define JY901S_ONLINE_TIMEOUT_MS  250U
+
 typedef struct
 {
     float acc[3];       /* g */

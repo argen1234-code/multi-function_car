@@ -4281,6 +4281,42 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
+      <PathWithFileName>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_Road.c</PathWithFileName>
+      <FilenameWithoutPath>ui_font_Road.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>15</GroupNumber>
+      <FileNumber>326</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
+      <PathWithFileName>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_CN14.c</PathWithFileName>
+      <FilenameWithoutPath>ui_font_CN14.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>15</GroupNumber>
+      <FileNumber>327</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
+      <PathWithFileName>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_CN64.c</PathWithFileName>
+      <FilenameWithoutPath>ui_font_CN64.c</FilenameWithoutPath>
+      <RteFlg>0</RteFlg>
+      <bShared>0</bShared>
+    </File>
+    <File>
+      <GroupNumber>15</GroupNumber>
+      <FileNumber>328</FileNumber>
+      <FileType>1</FileType>
+      <tvExp>0</tvExp>
+      <tvExpOptDlg>0</tvExpOptDlg>
+      <bDave2>0</bDave2>
       <PathWithFileName>..\Middware\LVGL\demos\01_interactive_page\fonts\ui_font_Font3.c</PathWithFileName>
       <FilenameWithoutPath>ui_font_Font3.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
@@ -4288,7 +4324,7 @@
     </File>
     <File>
       <GroupNumber>15</GroupNumber>
-      <FileNumber>326</FileNumber>
+      <FileNumber>329</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
@@ -4300,7 +4336,7 @@
     </File>
     <File>
       <GroupNumber>15</GroupNumber>
-      <FileNumber>327</FileNumber>
+      <FileNumber>330</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
@@ -4320,7 +4356,7 @@
     <RteFlg>0</RteFlg>
     <File>
       <GroupNumber>16</GroupNumber>
-      <FileNumber>328</FileNumber>
+      <FileNumber>331</FileNumber>
       <FileType>1</FileType>
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>

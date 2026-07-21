@@ -145,14 +145,21 @@ void JY901S_RxPro_HAL(uint8_t *pBuf, uint16_t Size)
 uint8_t JY901S_GetData(JY901S_Data_t *pData)
 {
     uint32_t primask;
+    uint32_t now;
 
     if (pData == NULL)
     {
         return 0;
     }
 
+    now = HAL_GetTick();
     primask = __get_PRIMASK();
     __disable_irq();
+    if (s_jy901s_data.last_update_tick == 0U ||
+        (uint32_t)(now - s_jy901s_data.last_update_tick) > JY901S_ONLINE_TIMEOUT_MS)
+    {
+        s_jy901s_data.online = 0U;
+    }
     *pData = s_jy901s_data;
     if (primask == 0U)
     {

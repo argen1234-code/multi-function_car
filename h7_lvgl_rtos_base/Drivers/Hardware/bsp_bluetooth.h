@@ -41,7 +41,8 @@ typedef uint8_t BT_RoadDisplay_t;
 #define BT_ROAD_DISPLAY_INDOORS          ((BT_RoadDisplay_t)1U)
 #define BT_ROAD_DISPLAY_CEMENT           ((BT_RoadDisplay_t)2U)
 #define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)3U)
-#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)4U)
+#define BT_ROAD_DISPLAY_OUTDOORS         ((BT_RoadDisplay_t)4U)
+#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)5U)
 
 /* Compatibility aliases for the existing Bluetooth text commands. */
 #define BT_ROAD_DISPLAY_MARBLE           BT_ROAD_DISPLAY_INDOORS

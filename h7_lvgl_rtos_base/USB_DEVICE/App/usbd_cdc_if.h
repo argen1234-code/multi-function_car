@@ -107,10 +107,8 @@ extern USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
   */
 
 uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
-
-extern uint8_t  UserRxBufferFS[];
-extern volatile uint8_t  usb_rx_flag;
-extern volatile uint32_t usb_rx_len;
+uint16_t CDC_ReadRxData(uint8_t* Buf, uint16_t MaxLen);
+uint32_t CDC_GetRxOverflowCount(void);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */
 

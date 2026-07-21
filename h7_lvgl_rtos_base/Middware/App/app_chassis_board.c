@@ -1280,7 +1280,8 @@ static uint8_t chassis_is_jetson_online(chassis_move_t *chassis)
 {
     if (chassis == NULL) return 0U;
 
-    return (HAL_GetTick() - chassis->jetson_last_tick < JETSON_TIMEOUT_MS) ? 1U : 0U;
+    return (chassis->jetson_last_tick != 0U &&
+            (uint32_t)(HAL_GetTick() - chassis->jetson_last_tick) < JETSON_TIMEOUT_MS) ? 1U : 0U;
 }
 
 /*
@@ -1494,14 +1495,12 @@ void chassis_feedback_update(chassis_move_t *chassis)
 
     {
         JY901S_Data_t jy901s_data;
-        if (JY901S_GetData(&jy901s_data))
+        (void)JY901S_GetData(&jy901s_data);
+        chassis->imu.jy901s = jy901s_data;
+        chassis_update_jy901s_debug_snapshot(&jy901s_data);
+        if (jy901s_data.online)
         {
-            chassis->imu.jy901s = jy901s_data;
-            /*
-             * 将“已经被底盘采用”的同一帧复制到全局调试镜像，便于 Keil 观察。
-             * 这行只增加 RAM 镜像，不会影响后续姿态、运动学、PID 或电机输出。
-             */
-            chassis_update_jy901s_debug_snapshot(&jy901s_data);
+            /* Only fresh frames update the INS attitude used by the display. */
             chassis->imu.ins.euler.roll = jy901s_data.angle[0];
             chassis->imu.ins.euler.pitch = jy901s_data.angle[1];
             chassis->imu.ins.euler.yaw = jy901s_data.angle[2];
@@ -1516,11 +1515,19 @@ void chassis_feedback_update(chassis_move_t *chassis)
         chassis->motor[i].last_update_tick = now;
     }
 
-    /* USB Jetson cmd_vel / scene_cmd frames. */
-    if (usb_rx_flag)
+    /* Drain the interrupt-side USB CDC ring before parsing the byte stream. */
     {
-        USB_ProcessRxData(UserRxBufferFS, (uint16_t)usb_rx_len);
-        usb_rx_flag = 0;
+        uint8_t usb_rx_data[64U];
+        uint16_t usb_rx_size;
+
+        do
+        {
+            usb_rx_size = CDC_ReadRxData(usb_rx_data, (uint16_t)sizeof(usb_rx_data));
+            if (usb_rx_size > 0U)
+            {
+                USB_ProcessRxData(usb_rx_data, usb_rx_size);
+            }
+        } while (usb_rx_size > 0U);
     }
     chassis->cmd_vel = USB_GetCmdVel();
     {
@@ -1545,9 +1552,9 @@ void chassis_feedback_update(chassis_move_t *chassis)
              */
         }
     }
-    if (chassis->cmd_vel.mode != 0)
+    if (chassis->cmd_vel.last_update_tick != 0U)
     {
-        chassis->jetson_last_tick = HAL_GetTick();
+        chassis->jetson_last_tick = chassis->cmd_vel.last_update_tick;
     }
 
     /* GPS position -> chassis->date_to_usb (NMEA to decimal degrees) */

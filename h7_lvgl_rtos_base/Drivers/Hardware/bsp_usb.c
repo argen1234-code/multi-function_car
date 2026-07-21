@@ -10,7 +10,7 @@
 static uint8_t   rx_buf[RX_FRAME_MAX_SIZE];
 static uint8_t   rx_idx = 0;
 static uint8_t   rx_expected_size = 0U;
-static cmd_vel_t cmd_vel = {0, 0.0f, 0.0f};
+static cmd_vel_t cmd_vel = {0};
 static scene_cmd_t scene_cmd = {JETSON_SCENE_NONE, 0U, 0U};
 
 static void USB_RxReset(void)
@@ -33,6 +33,8 @@ void USB_Init(void)
     cmd_vel.mode = 0;
     cmd_vel.vx = 0.0f;
     cmd_vel.vz = 0.0f;
+    cmd_vel.last_update_tick = 0U;
+    cmd_vel.update_sequence = 0U;
     scene_cmd.scene = JETSON_SCENE_NONE;
     scene_cmd.last_update_tick = 0U;
     scene_cmd.update_sequence = 0U;
@@ -82,6 +84,8 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 cmd_vel.mode = rx_buf[2];
                 memcpy(&cmd_vel.vx, &rx_buf[3], 4U);
                 memcpy(&cmd_vel.vz, &rx_buf[7], 4U);
+                cmd_vel.last_update_tick = HAL_GetTick();
+                cmd_vel.update_sequence++;
             }
             else
             {

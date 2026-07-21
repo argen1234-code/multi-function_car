@@ -93,10 +93,14 @@ uint8_t UserRxBufferFS[APP_RX_DATA_SIZE];
 /** Data to send over USB CDC are stored in this buffer   */
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
-volatile uint8_t  usb_rx_flag = 0;
-volatile uint32_t usb_rx_len = 0;
-
 /* USER CODE BEGIN PRIVATE_VARIABLES */
+
+#define CDC_RX_RING_SIZE  2048U
+
+static uint8_t cdc_rx_ring[CDC_RX_RING_SIZE];
+static volatile uint16_t cdc_rx_head = 0U;
+static volatile uint16_t cdc_rx_tail = 0U;
+static volatile uint32_t cdc_rx_overflow_count = 0U;
 
 /* USER CODE END PRIVATE_VARIABLES */
 
@@ -128,6 +132,8 @@ static int8_t CDC_Init_FS(void);
 static int8_t CDC_DeInit_FS(void);
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length);
 static int8_t CDC_Receive_FS(uint8_t* pbuf, uint32_t *Len);
+
+static void CDC_RxQueuePush(const uint8_t* Buf, uint32_t Len);
 static int8_t CDC_TransmitCplt_FS(uint8_t *pbuf, uint32_t *Len, uint8_t epnum);
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_DECLARATION */
@@ -155,6 +161,9 @@ USBD_CDC_ItfTypeDef USBD_Interface_fops_FS =
 static int8_t CDC_Init_FS(void)
 {
   /* USER CODE BEGIN 3 */
+  cdc_rx_head = 0U;
+  cdc_rx_tail = 0U;
+  cdc_rx_overflow_count = 0U;
   /* Set Application Buffers */
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, UserTxBufferFS, 0);
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
@@ -264,12 +273,81 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
-  usb_rx_len = *Len;
-  usb_rx_flag = 1;
-  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+  if (Buf != NULL && Len != NULL)
+  {
+    CDC_RxQueuePush(Buf, *Len);
+  }
+  USBD_CDC_SetRxBuffer(&hUsbDeviceFS, UserRxBufferFS);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
   /* USER CODE END 6 */
+}
+
+static void CDC_RxQueuePush(const uint8_t* Buf, uint32_t Len)
+{
+  uint32_t i;
+
+  if (Buf == NULL || Len == 0U)
+  {
+    return;
+  }
+
+  for (i = 0U; i < Len; i++)
+  {
+    uint16_t head = cdc_rx_head;
+    uint16_t next = (uint16_t)(head + 1U);
+
+    if (next >= CDC_RX_RING_SIZE)
+    {
+      next = 0U;
+    }
+
+    if (next == cdc_rx_tail)
+    {
+      cdc_rx_overflow_count += (Len - i);
+      break;
+    }
+
+    cdc_rx_ring[head] = Buf[i];
+    __DMB();
+    cdc_rx_head = next;
+  }
+}
+
+uint16_t CDC_ReadRxData(uint8_t* Buf, uint16_t MaxLen)
+{
+  uint16_t count = 0U;
+
+  if (Buf == NULL || MaxLen == 0U)
+  {
+    return 0U;
+  }
+
+  while (count < MaxLen)
+  {
+    uint16_t tail = cdc_rx_tail;
+
+    if (tail == cdc_rx_head)
+    {
+      break;
+    }
+
+    Buf[count++] = cdc_rx_ring[tail];
+    tail++;
+    if (tail >= CDC_RX_RING_SIZE)
+    {
+      tail = 0U;
+    }
+    __DMB();
+    cdc_rx_tail = tail;
+  }
+
+  return count;
+}
+
+uint32_t CDC_GetRxOverflowCount(void)
+{
+  return cdc_rx_overflow_count;
 }
 
 /**

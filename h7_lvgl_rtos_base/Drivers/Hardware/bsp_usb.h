@@ -15,6 +15,8 @@ typedef struct {
     uint8_t mode;    /* 1=GPS, 2=REMOTE, 3=LINE */
     float   vx;      /* 线速度 (m/s), 正值前进 */
     float   vz;      /* 角速度 (rad/s), 正值左转 (Z轴向上) */
+    uint32_t last_update_tick; /* Last checksum-valid cmd_vel frame tick. */
+    uint32_t update_sequence;  /* Increments once per valid cmd_vel frame. */
 } cmd_vel_t;
 
 /* Jetson scene_cmd: BB 55 cmd XOR, cmd=1 indoor / 2 outdoor. */

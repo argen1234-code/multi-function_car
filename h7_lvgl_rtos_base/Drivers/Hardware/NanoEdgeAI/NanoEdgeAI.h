@@ -35,7 +35,7 @@ provided that the following conditions are met:
 #include <stdint.h>
 
 /* NEAI ID */
-#define NEAI_ID "6a5b7983ae7a6f0e8fca6ba3"
+#define NEAI_ID "6a5fc92cfd819c3c7aa16876"
 
 /* Input signal configuration */
 #define NEAI_INPUT_SIGNAL_LENGTH 32
@@ -43,7 +43,7 @@ provided that the following conditions are met:
 
 
 /* Classification configuration */
-#define NEAI_NUMBER_OF_CLASSES 3
+#define NEAI_NUMBER_OF_CLASSES 2
 
 /* NEAI State Enum */
 enum neai_state {
