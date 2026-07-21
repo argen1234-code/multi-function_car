@@ -30,17 +30,24 @@ typedef enum {
     BT_MODE_REQ_GPS_CLEAR_POINTS
 } BT_ModeReq_t;
 
-/* Shared road display selected by Jetson, Bluetooth, or the LVGL button. */
+typedef struct {
+    double lat;
+    double lon;
+} BT_RemotePoint_t;
+
+/* Shared road display selected by the classifier, Bluetooth, or the LVGL button. */
 typedef uint8_t BT_RoadDisplay_t;
 #define BT_ROAD_DISPLAY_NOT_STARTED      ((BT_RoadDisplay_t)0U)
-#define BT_ROAD_DISPLAY_MARBLE           ((BT_RoadDisplay_t)1U)
-#define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)2U)
-#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)3U)
+#define BT_ROAD_DISPLAY_INDOORS          ((BT_RoadDisplay_t)1U)
+#define BT_ROAD_DISPLAY_CEMENT           ((BT_RoadDisplay_t)2U)
+#define BT_ROAD_DISPLAY_ASPHALT          ((BT_RoadDisplay_t)3U)
+#define BT_ROAD_DISPLAY_COUNT            ((BT_RoadDisplay_t)4U)
 
 /* Compatibility aliases for the existing Bluetooth text commands. */
-#define BT_ROAD_DISPLAY_INDOOR           BT_ROAD_DISPLAY_MARBLE
-#define BT_ROAD_DISPLAY_OUTDOOR_MARBLE   BT_ROAD_DISPLAY_MARBLE
-#define BT_ROAD_DISPLAY_OUTDOOR_CEMENT   BT_ROAD_DISPLAY_ASPHALT
+#define BT_ROAD_DISPLAY_MARBLE           BT_ROAD_DISPLAY_INDOORS
+#define BT_ROAD_DISPLAY_INDOOR           BT_ROAD_DISPLAY_INDOORS
+#define BT_ROAD_DISPLAY_OUTDOOR_MARBLE   BT_ROAD_DISPLAY_INDOORS
+#define BT_ROAD_DISPLAY_OUTDOOR_CEMENT   BT_ROAD_DISPLAY_CEMENT
 
 /*
  * Keil Watch debug mirror for the Bluetooth receive path.
@@ -62,6 +69,7 @@ typedef struct
     uint32_t complete_frame_count;  /* CRLF frames plus road-command idle fallback. */
     uint32_t accepted_token_count;  /* Frames/tokens that queued an ACK. */
     uint32_t ack_queued_count;      /* Number of ACKs queued successfully. */
+    uint32_t error_queued_count;    /* Number of error responses queued. */
     uint32_t frame_overflow_count;  /* Payloads exceeding parser capacity. */
     uint32_t format_error_count;    /* CR not followed by LF. */
 
@@ -86,7 +94,11 @@ typedef struct
     BT_ModeReq_t pending_mode_req;  /* Request not yet consumed by chassis task. */
     BT_ModeReq_t last_mode_req;     /* Last non-NONE request, retained for Watch. */
     uint8_t      ack_pending;       /* ACK count awaiting chassis transmission. */
+    uint8_t      error_pending;     /* Error count awaiting chassis transmission. */
     uint8_t      last_ack_count;    /* ACK count last consumed by chassis task. */
+    uint8_t      remote_add_waiting;/* Next complete frame must be lat,lon. */
+    uint8_t      remote_point_pending;
+    BT_RemotePoint_t remote_point;
 } BT_Debug_t;
 
 /* Add this single symbol to Keil Watch and expand it. Read-only for users. */
@@ -100,6 +112,8 @@ uint8_t        BT_IsActive(void);
 uint8_t        BT_IsOnline(void);
 uint8_t        BT_GetKeyState(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
+uint8_t        BT_GetAndClearRemotePoint(BT_RemotePoint_t *point);
+void           BT_ReportRemotePointResult(uint8_t success);
 uint8_t        BT_GetAndClearAckCount(void);
 void           BT_ServicePendingAck(void);
 BT_RoadDisplay_t BT_GetRoadDisplay(void);

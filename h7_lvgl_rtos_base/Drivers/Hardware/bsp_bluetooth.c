@@ -12,8 +12,12 @@ static volatile uint8_t      bt_cmd       = 'S';
 static volatile uint8_t      bt_key_state = 0U;
 static volatile BT_ModeReq_t bt_mode_req  = BT_MODE_REQ_NONE;
 static volatile uint8_t      bt_ack_count = 0U;
+static volatile uint8_t      bt_error_count = 0U;
 static volatile uint32_t     bt_last_rx_tick = 0U;
 static volatile BT_RoadDisplay_t bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
+static volatile uint8_t      bt_remote_add_waiting = 0U;
+static volatile uint8_t      bt_remote_point_pending = 0U;
+static BT_RemotePoint_t      bt_remote_point = {0.0, 0.0};
 static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
 static uint8_t               bt_frame_active = 0U;
@@ -50,6 +54,7 @@ static void bt_debug_reset(void)
     g_bt_debug.complete_frame_count = 0U;
     g_bt_debug.accepted_token_count = 0U;
     g_bt_debug.ack_queued_count = 0U;
+    g_bt_debug.error_queued_count = 0U;
     g_bt_debug.frame_overflow_count = 0U;
     g_bt_debug.format_error_count = 0U;
     g_bt_debug.last_rx_event_tick = 0U;
@@ -69,7 +74,12 @@ static void bt_debug_reset(void)
     g_bt_debug.pending_mode_req = BT_MODE_REQ_NONE;
     g_bt_debug.last_mode_req = BT_MODE_REQ_NONE;
     g_bt_debug.ack_pending = 0U;
+    g_bt_debug.error_pending = 0U;
     g_bt_debug.last_ack_count = 0U;
+    g_bt_debug.remote_add_waiting = 0U;
+    g_bt_debug.remote_point_pending = 0U;
+    g_bt_debug.remote_point.lat = 0.0;
+    g_bt_debug.remote_point.lon = 0.0;
 
     for (i = 0U; i < BT_DEBUG_RAW_MAX_LEN; i++)
     {
@@ -104,6 +114,11 @@ static void bt_debug_sync_state(void)
         g_bt_debug.last_mode_req = bt_mode_req;
     }
     g_bt_debug.ack_pending = bt_ack_count;
+    g_bt_debug.error_pending = bt_error_count;
+    g_bt_debug.remote_add_waiting = bt_remote_add_waiting;
+    g_bt_debug.remote_point_pending = bt_remote_point_pending;
+    g_bt_debug.remote_point.lat = bt_remote_point.lat;
+    g_bt_debug.remote_point.lon = bt_remote_point.lon;
     g_bt_debug.update_sequence++;
 }
 
@@ -158,6 +173,19 @@ static char bt_to_lower(char c)
     return c;
 }
 
+static uint8_t bt_payload_equals(const char *payload, const char *token)
+{
+    uint16_t i = 0U;
+
+    if (payload == NULL || token == NULL) return 0U;
+    while (payload[i] != '\0' && token[i] != '\0')
+    {
+        if (bt_to_lower(payload[i]) != token[i]) return 0U;
+        i++;
+    }
+    return (payload[i] == '\0' && token[i] == '\0') ? 1U : 0U;
+}
+
 static uint8_t bt_is_token_char(char c)
 {
     return ((c >= 'a' && c <= 'z') ||
@@ -172,15 +200,87 @@ static void bt_clear_motion(void)
     bt_key_state = 0U;
 }
 
-static void bt_queue_ack(void)
+static void bt_queue_ok_response(void)
 {
-    g_bt_debug.accepted_token_count++;
-
     if (bt_ack_count < 255U)
     {
         bt_ack_count++;
         g_bt_debug.ack_queued_count++;
     }
+}
+
+static void bt_queue_ack(void)
+{
+    g_bt_debug.accepted_token_count++;
+    bt_queue_ok_response();
+}
+
+static void bt_queue_error_response(void)
+{
+    if (bt_error_count < 255U)
+    {
+        bt_error_count++;
+        g_bt_debug.error_queued_count++;
+    }
+}
+
+static uint8_t bt_parse_decimal_component(const char **cursor,
+                                          char terminator,
+                                          double minimum,
+                                          double maximum,
+                                          double *value)
+{
+    const char *p;
+    double result = 0.0;
+    double fraction_scale = 0.1;
+    uint8_t negative = 0U;
+    uint8_t integer_digits = 0U;
+    uint8_t fraction_digits = 0U;
+
+    if (cursor == NULL || *cursor == NULL || value == NULL) return 0U;
+
+    p = *cursor;
+    if (*p == '+' || *p == '-')
+    {
+        negative = (*p == '-') ? 1U : 0U;
+        p++;
+    }
+
+    while (*p >= '0' && *p <= '9')
+    {
+        result = result * 10.0 + (double)(*p - '0');
+        integer_digits++;
+        p++;
+    }
+
+    if (integer_digits == 0U || *p != '.') return 0U;
+    p++;
+
+    while (*p >= '0' && *p <= '9')
+    {
+        result += (double)(*p - '0') * fraction_scale;
+        fraction_scale *= 0.1;
+        fraction_digits++;
+        p++;
+    }
+
+    if (fraction_digits < 8U || *p != terminator) return 0U;
+    if (negative) result = -result;
+    if (result < minimum || result > maximum) return 0U;
+
+    *value = result;
+    *cursor = (terminator == '\0') ? p : (p + 1);
+    return 1U;
+}
+
+static uint8_t bt_parse_remote_point(const char *payload, BT_RemotePoint_t *point)
+{
+    const char *cursor = payload;
+
+    if (payload == NULL || point == NULL || payload[0] == '\0') return 0U;
+    if (!bt_parse_decimal_component(&cursor, ',', -90.0, 90.0, &point->lat)) return 0U;
+    if (!bt_parse_decimal_component(&cursor, '\0', -180.0, 180.0, &point->lon)) return 0U;
+    return (*cursor == '\0') ? 1U : 0U;
 }
 
 static void bt_toggle_motion(uint8_t key_bit, uint8_t cmd)
@@ -421,6 +521,31 @@ static void bt_process_payload(const char *payload)
         return;
     }
 
+    if (bt_remote_add_waiting)
+    {
+        BT_RemotePoint_t point;
+
+        /* The coordinate state is one-shot, regardless of parse success. */
+        bt_remote_add_waiting = 0U;
+        if (!bt_remote_point_pending && bt_parse_remote_point(payload, &point))
+        {
+            bt_remote_point = point;
+            bt_remote_point_pending = 1U;
+        }
+        else
+        {
+            bt_queue_error_response();
+        }
+        return;
+    }
+
+    if (bt_payload_equals(payload, "remote_add"))
+    {
+        bt_remote_add_waiting = 1U;
+        bt_queue_ack();
+        return;
+    }
+
     while (payload[i] != '\0')
     {
         char ch = payload[i++];
@@ -463,8 +588,13 @@ void BT_Init(void)
     bt_key_state = 0U;
     bt_mode_req  = BT_MODE_REQ_NONE;
     bt_ack_count = 0U;
+    bt_error_count = 0U;
     bt_last_rx_tick = 0U;
     bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
+    bt_remote_add_waiting = 0U;
+    bt_remote_point_pending = 0U;
+    bt_remote_point.lat = 0.0;
+    bt_remote_point.lon = 0.0;
     bt_frame_reset();
     bt_debug_reset();
     bt_debug_sync_state();
@@ -522,6 +652,11 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
             else
             {
                 g_bt_debug.format_error_count++;
+                if (bt_remote_add_waiting)
+                {
+                    bt_remote_add_waiting = 0U;
+                    bt_queue_error_response();
+                }
                 bt_frame_reset();
             }
             continue;
@@ -540,6 +675,11 @@ void BT_ProcessRxData(uint8_t *pBuf, uint16_t Size)
         else
         {
             g_bt_debug.frame_overflow_count++;
+            if (bt_remote_add_waiting)
+            {
+                bt_remote_add_waiting = 0U;
+                bt_queue_error_response();
+            }
             bt_frame_reset();
         }
     }
@@ -557,8 +697,22 @@ void BT_ProcessRxIdle(void)
     char token[BT_TOKEN_MAX_LEN];
     uint8_t i;
 
-    if (!bt_frame_active || bt_frame_saw_cr || bt_frame_len == 0U ||
-        bt_frame_len >= BT_TOKEN_MAX_LEN)
+    if (!bt_frame_active || bt_frame_saw_cr || bt_frame_len == 0U)
+    {
+        return;
+    }
+
+    if (bt_remote_add_waiting)
+    {
+        /* Remote coordinates always require the complete @lat,lon\r\n frame. */
+        bt_remote_add_waiting = 0U;
+        bt_queue_error_response();
+        bt_frame_reset();
+        bt_debug_sync_state();
+        return;
+    }
+
+    if (bt_frame_len >= BT_TOKEN_MAX_LEN)
     {
         return;
     }
@@ -671,6 +825,43 @@ BT_ModeReq_t BT_GetAndClearModeReq(void)
     return req;
 }
 
+uint8_t BT_GetAndClearRemotePoint(BT_RemotePoint_t *point)
+{
+    uint8_t pending;
+    uint32_t primask;
+
+    if (point == NULL) return 0U;
+
+    primask = __get_PRIMASK();
+    __disable_irq();
+    pending = bt_remote_point_pending;
+    if (pending)
+    {
+        *point = bt_remote_point;
+        bt_remote_point_pending = 0U;
+    }
+    if (primask == 0U)
+    {
+        __enable_irq();
+    }
+
+    bt_debug_sync_state();
+    return pending;
+}
+
+void BT_ReportRemotePointResult(uint8_t success)
+{
+    if (success)
+    {
+        bt_queue_ok_response();
+    }
+    else
+    {
+        bt_queue_error_response();
+    }
+    bt_debug_sync_state();
+}
+
 uint8_t BT_GetAndClearAckCount(void)
 {
     uint8_t count;
@@ -688,6 +879,7 @@ uint8_t BT_GetAndClearAckCount(void)
 void BT_ServicePendingAck(void)
 {
     static const uint8_t ack_msg[] = {'o', 'k', '\r', '\n'};
+    static const uint8_t error_msg[] = {'e', 'r', 'r', 'o', 'r', '\r', '\n'};
     uint8_t sent_count = 0U;
     uint32_t primask;
 
@@ -710,6 +902,25 @@ void BT_ServicePendingAck(void)
             __enable_irq();
         }
         sent_count++;
+    }
+
+    while (bt_error_count > 0U)
+    {
+        if (HAL_UART_Transmit(&huart1, (uint8_t *)error_msg, sizeof(error_msg), 10U) != HAL_OK)
+        {
+            break;
+        }
+
+        primask = __get_PRIMASK();
+        __disable_irq();
+        if (bt_error_count > 0U)
+        {
+            bt_error_count--;
+        }
+        if (primask == 0U)
+        {
+            __enable_irq();
+        }
     }
 
     if (sent_count > 0U)

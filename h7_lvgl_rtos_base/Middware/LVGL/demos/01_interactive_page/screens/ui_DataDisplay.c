@@ -9,6 +9,7 @@
 #include "ui_DataDetail.h"
 #include "app_chassis_board.h"
 #include "bsp_bluetooth.h"
+#include "bsp_road_classification.h"
 #include <stdio.h>
 
 #define PANEL_W   360
@@ -22,19 +23,23 @@
 /* ARMCC5 source strings use explicit UTF-8 bytes for the LVGL Chinese font. */
 #define ROAD_TEXT_PREFIX       "\xE8\xB7\xAF\xE9\x9D\xA2: "
 #define ROAD_TEXT_NOT_STARTED  "\xE6\x9C\xAA\xE5\xBC\x80\xE5\xA7\x8B\xE8\xAF\x86\xE5\x88\xAB"
-#define ROAD_TEXT_MARBLE       "\xE5\xA4\xA7\xE7\x90\x86\xE7\x9F\xB3"
+#define ROAD_TEXT_INDOORS      "\xE5\xAE\xA4\xE5\x86\x85\xE5\x9C\xB0\xE9\x9D\xA2"
+#define ROAD_TEXT_CEMENT       "\xE6\xB0\xB4\xE6\xB3\xA5\xE8\xB7\xAF"
 #define ROAD_TEXT_ASPHALT      "\xE6\x9F\x8F\xE6\xB2\xB9\xE8\xB7\xAF"
 
 lv_obj_t *ui_DataDisplay = NULL;
 
 static const char * const road_conditions[] = {
 	ROAD_TEXT_NOT_STARTED,
-	ROAD_TEXT_MARBLE,
+	ROAD_TEXT_INDOORS,
+	ROAD_TEXT_CEMENT,
 	ROAD_TEXT_ASPHALT
 };
 
 static lv_obj_t *lb_gps = NULL, *lb_speed = NULL, *lb_imu = NULL, *lb_mode = NULL;
 static lv_obj_t *lb_road = NULL;
+static uint32_t road_last_classification_tick = 0U;
+static uint8_t road_model_result_valid = 0U;
 
 static uint8_t sensor_tick_online(uint32_t tick, uint32_t timeout)
 {
@@ -124,9 +129,33 @@ static const char *mode_name_from_chassis(CarMode_t mode)
 
 static const char *road_condition_get(void)
 {
-	uint8_t index = (uint8_t)BT_GetRoadDisplay();
+	BSP_RoadClassificationResult_t result;
+	BT_RoadDisplay_t display = BT_ROAD_DISPLAY_NOT_STARTED;
+	uint8_t index;
 	uint8_t count = (uint8_t)(sizeof(road_conditions) / sizeof(road_conditions[0]));
 
+	BSP_RoadClassification_GetResult(&result);
+	if (result.state == BSP_ROAD_CLASSIFICATION_READY && result.has_result) {
+		switch (result.class_id) {
+		case BSP_ROAD_CLASS_INDOORS: display = BT_ROAD_DISPLAY_INDOORS; break;
+		case BSP_ROAD_CLASS_CEMENT:  display = BT_ROAD_DISPLAY_CEMENT;  break;
+		case BSP_ROAD_CLASS_ASPHALT: display = BT_ROAD_DISPLAY_ASPHALT; break;
+		default:                     display = BT_ROAD_DISPLAY_NOT_STARTED; break;
+		}
+
+		if (!road_model_result_valid ||
+		    result.last_classification_tick != road_last_classification_tick) {
+			BT_SetRoadDisplay(display);
+			road_last_classification_tick = result.last_classification_tick;
+			road_model_result_valid = 1U;
+		}
+	} else if (road_model_result_valid) {
+		BT_SetRoadDisplay(BT_ROAD_DISPLAY_NOT_STARTED);
+		road_last_classification_tick = 0U;
+		road_model_result_valid = 0U;
+	}
+
+	index = (uint8_t)BT_GetRoadDisplay();
 	if (index >= count) index = 0U;
 	return road_conditions[index];
 }
@@ -203,8 +232,11 @@ static void road_change_cb(lv_event_t *e)
 	if (lv_event_get_code(e) != LV_EVENT_CLICKED) return;
 
 	current = BT_GetRoadDisplay();
-	next = (current == BT_ROAD_DISPLAY_MARBLE) ?
-	       BT_ROAD_DISPLAY_ASPHALT : BT_ROAD_DISPLAY_MARBLE;
+	if (current < BT_ROAD_DISPLAY_INDOORS || current >= BT_ROAD_DISPLAY_ASPHALT) {
+		next = BT_ROAD_DISPLAY_INDOORS;
+	} else {
+		next = (BT_RoadDisplay_t)(current + 1U);
+	}
 	BT_SetRoadDisplay(next);
 	refresh_values();
 }

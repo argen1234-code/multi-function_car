@@ -86,6 +86,8 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
 static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 static void chassis_load_gps_route_from_flash(void);
 static uint8_t chassis_save_gps_route_to_flash(void);
+static uint8_t chassis_add_remote_gps_point(chassis_move_t *chassis,
+                                            const BT_RemotePoint_t *remote_point);
 
 /*
  * 复制刚收到的 JY901S 完整数据帧，仅服务于在线调试。
@@ -757,6 +759,46 @@ static uint8_t chassis_add_current_gps_point(chassis_move_t *chassis)
     return 1U;
 }
 
+static uint8_t chassis_add_remote_gps_point(chassis_move_t *chassis,
+                                            const BT_RemotePoint_t *remote_point)
+{
+    GPS_Point_t point;
+
+    if (remote_point == NULL ||
+        remote_point->lat != remote_point->lat ||
+        remote_point->lon != remote_point->lon ||
+        remote_point->lat < -90.0 || remote_point->lat > 90.0 ||
+        remote_point->lon < -180.0 || remote_point->lon > 180.0)
+    {
+        g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_INVALID_FIX;
+        return 0U;
+    }
+
+    if (chassis_gps_route_count >= MAX_WAYPOINTS)
+    {
+        g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_FULL;
+        return 0U;
+    }
+
+    point.lat = remote_point->lat;
+    point.lon = remote_point->lon;
+    chassis_gps_route[chassis_gps_route_count] = point;
+    chassis_gps_route_count++;
+    g_chassis_gps_route_count_debug = chassis_gps_route_count;
+    g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_POINT_ADDED;
+
+    if (chassis != NULL &&
+        (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS))
+    {
+        Navigation_Set_Route_Loop(&chassis->nav,
+                                  chassis_gps_route,
+                                  chassis_gps_route_count);
+    }
+
+    (void)chassis_save_gps_route_to_flash();
+    return 1U;
+}
+
 static void chassis_init_magnetometer_once(chassis_move_t *chassis)
 {
     if (chassis_mag_initialized || chassis_mag_initializing) return;
@@ -1054,6 +1096,11 @@ void chassis_feedback_update(chassis_move_t *chassis)
         if (scene.update_sequence != chassis_scene_sequence)
         {
             chassis_scene_sequence = scene.update_sequence;
+            /*
+             * 微信/Jetson indoor、outdoor 对路面显示的手动覆盖暂时停用。
+             * LVGL 现在直接读取 BSP_RoadClassification_GetResult() 的模型结果。
+             * 保留 scene_cmd 的接收和序号消费，避免改变现有串口协议。
+             *
             if (scene.scene == JETSON_SCENE_INDOOR)
             {
                 BT_SetRoadDisplay(BT_ROAD_DISPLAY_MARBLE);
@@ -1062,6 +1109,7 @@ void chassis_feedback_update(chassis_move_t *chassis)
             {
                 BT_SetRoadDisplay(BT_ROAD_DISPLAY_ASPHALT);
             }
+             */
         }
     }
     if (chassis->cmd_vel.mode != 0)
@@ -1254,11 +1302,17 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms)
 void chassis_mode_change(chassis_move_t *chassis)
 {
     BT_ModeReq_t req;
+    BT_RemotePoint_t remote_point;
     CarMode_t requested_mode;
     uint8_t jetson_online;
     uint8_t jetson_mode;
 
     if (chassis == NULL) return;
+
+    if (BT_GetAndClearRemotePoint(&remote_point))
+    {
+        BT_ReportRemotePointResult(chassis_add_remote_gps_point(chassis, &remote_point));
+    }
 
     if (gui_req_mode >= 0 && gui_req_mode <= 6) {
         requested_mode = (CarMode_t)gui_req_mode;

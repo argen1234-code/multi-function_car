@@ -77,7 +77,7 @@ void ui_Login_screen_init(void)
 
 	/* ---- Title ---- */
 	lv_obj_t *title = lv_label_create(ui_Login);
-	lv_label_set_text(title, "\xE5\xA4\x9A\xE5\x8A\x9F\xE8\x83\xBD\xE5\xB0\x8F\xE8\xBD\xA6");
+	lv_label_set_text(title, "\xE6\x88\x91\xE4\xBB\xAC\xE6\x98\xAF\xE4\xB8\x93\xE4\xB8\x9A\xE5\x9B\xA2\xE9\x98\x9F");
 	lv_obj_set_style_text_color(title, lv_color_hex(UI_COLOR_CYAN_DARK), LV_PART_MAIN);
 	lv_obj_set_style_text_font(title, &ui_font_CN64, LV_PART_MAIN);
 	lv_obj_set_align(title, LV_ALIGN_TOP_MID);
