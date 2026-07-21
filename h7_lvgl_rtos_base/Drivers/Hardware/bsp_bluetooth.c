@@ -17,6 +17,7 @@ static volatile uint32_t     bt_last_rx_tick = 0U;
 static volatile BT_RoadDisplay_t bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
 static volatile uint8_t      bt_remote_add_waiting = 0U;
 static volatile uint8_t      bt_remote_point_pending = 0U;
+static volatile uint8_t      bt_powerless_latched = 0U;
 static BT_RemotePoint_t      bt_remote_point = {0.0, 0.0};
 static char                  bt_frame_buf[BT_FRAME_MAX_LEN];
 static uint8_t               bt_frame_len = 0U;
@@ -64,7 +65,7 @@ static void bt_debug_reset(void)
     g_bt_debug.frame_active = 0U;
     g_bt_debug.frame_saw_cr = 0U;
     g_bt_debug.frame_len = 0U;
-    g_bt_debug.reserved0 = 0U;
+    g_bt_debug.powerless_latched = 0U;
     g_bt_debug.last_payload_len = 0U;
     g_bt_debug.cmd = 'S';
     g_bt_debug.key_state = 0U;
@@ -101,6 +102,7 @@ static void bt_debug_sync_state(void)
     g_bt_debug.frame_active = bt_frame_active;
     g_bt_debug.frame_saw_cr = bt_frame_saw_cr;
     g_bt_debug.frame_len = bt_frame_len;
+    g_bt_debug.powerless_latched = bt_powerless_latched;
     g_bt_debug.cmd = bt_cmd;
     g_bt_debug.key_state = bt_key_state;
     g_bt_debug.active = active;
@@ -198,6 +200,24 @@ static void bt_clear_motion(void)
 {
     bt_cmd = 'S';
     bt_key_state = 0U;
+}
+
+static void bt_enter_powerless(void)
+{
+    bt_powerless_latched = 1U;
+    bt_clear_motion();
+    bt_mode_req = BT_MODE_REQ_NONE;
+    bt_remote_add_waiting = 0U;
+    bt_remote_point_pending = 0U;
+}
+
+static void bt_exit_powerless(void)
+{
+    bt_powerless_latched = 0U;
+    bt_clear_motion();
+    bt_mode_req = BT_MODE_REQ_NONE;
+    bt_remote_add_waiting = 0U;
+    bt_remote_point_pending = 0U;
 }
 
 static void bt_queue_ok_response(void)
@@ -521,6 +541,30 @@ static void bt_process_payload(const char *payload)
         return;
     }
 
+    /* Highest-priority one-symbol coast command, valid in every parser state. */
+    if (strcmp(payload, "!") == 0)
+    {
+        bt_enter_powerless();
+        bt_queue_ack();
+        return;
+    }
+
+    /* Recovery never resumes an old command; a new mode/motion command is required. */
+    if (strcmp(payload, "~") == 0 ||
+        bt_payload_equals(payload, "resume") ||
+        bt_payload_equals(payload, "power_on"))
+    {
+        bt_exit_powerless();
+        bt_queue_ack();
+        return;
+    }
+
+    if (bt_powerless_latched)
+    {
+        bt_queue_error_response();
+        return;
+    }
+
     if (bt_remote_add_waiting)
     {
         BT_RemotePoint_t point;
@@ -593,6 +637,7 @@ void BT_Init(void)
     bt_road_display = BT_ROAD_DISPLAY_NOT_STARTED;
     bt_remote_add_waiting = 0U;
     bt_remote_point_pending = 0U;
+    bt_powerless_latched = 0U;
     bt_remote_point.lat = 0.0;
     bt_remote_point.lon = 0.0;
     bt_frame_reset();
@@ -771,6 +816,12 @@ uint8_t BT_GetKeyState(void)
 {
     g_bt_debug.key_state = bt_key_state;
     return bt_key_state;
+}
+
+uint8_t BT_IsPowerless(void)
+{
+    g_bt_debug.powerless_latched = bt_powerless_latched;
+    return bt_powerless_latched;
 }
 
 BT_RoadDisplay_t BT_GetRoadDisplay(void)

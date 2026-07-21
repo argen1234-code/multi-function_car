@@ -7,13 +7,15 @@
 
 /* ---- 距离PID参数 ---- */
 static float Kp_dist  = 8.0f;     /* 米距 → 速度 单位转化比例 */
-static float Max_speed = 100.0f;   /* 最大平移速度限制 */
-static float Min_speed = 60.0f;   /* 克服底盘低速死区的最小平移速度 */
+static float Max_speed = 100.0f;   /* [调试] 最大平移速度限制 (原100) */
+static float Min_speed = 60.0f;   /* [调试] 克服底盘低速死区的最小平移速度 (原60) */
+//static float Max_speed = 0.0f;   /* [调试] 最大平移速度限制 (原100) */
+//static float Min_speed = 0.0f;   /* [调试] 克服底盘低速死区的最小平移速度 (原60) */
 
 /* ---- 航向偏角PID参数 ---- */
 static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */
 static float Max_wz  = 18.0f;     /* 最大旋转角速度限制 */
-
+//static float Max_wz  = 0.0f;     /* 最大旋转角速度限制 */
 /* Keil Watch-only navigation mirror; no control code reads it back. */
 static void Navigation_DebugSync(struct chassis_move_s *chassis, uint8_t navigation_mode)
 {
@@ -237,7 +239,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
         target_decimal_lat,   target_decimal_lon);
 
     /* 4. 到达判断 (2m 精度) */
-    if (nav->distance_error < 2.0f) {
+    if (nav->distance_error < 1.0f) {
         chassis->Vx_set = 0.0f;
         chassis->Vy_set = 0.0f;
         chassis->Wz_set = 0.0f;
@@ -293,9 +295,6 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
  *        本函数保留 GPS 航点管理, 以 ROS 指令为主控,
  *        ROS 无指令时自动回退为纯 GPS 蟹行
  * ============================================================ */
-#define ROS_VX_SCALE  100.0f   /* cmd_vel.vx (m/s) → 内部 RPM */
-#define ROS_VZ_SCALE   30.0f   /* cmd_vel.vz (rad/s) → 内部 RPM */
-
 void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
 {
     if (chassis == NULL) return;
@@ -389,34 +388,43 @@ void Navigation_Update_Loop_Fusion(struct chassis_move_s *chassis)
     float ros_vx = chassis->cmd_vel.vx;
     float ros_vz = chassis->cmd_vel.vz;
     float out_vx, out_wz;
+    float vx_limit = Max_speed;
+    float wz_limit = Max_wz;
 
     if (fabsf(ros_vx) > 0.01f)
     {
-        /* ROS 有有效前向指令 → 使用 ROS 规划结果 */
-        out_vx = ros_vx * ROS_VX_SCALE;
+        /* 与室内ROS导航复用同一套可调缩放及限幅参数。 */
+        out_vx = ros_vx * chassis->remote.ros_vx_scale;
+        vx_limit = fabsf(chassis->remote.ros_max_speed);
     }
     else
     {
         /* ROS 无指令 → GPS 距离 P 控 */
         out_vx = nav->distance_error * Kp_dist;
     }
-    if (out_vx > Max_speed) out_vx = Max_speed;
+    if (out_vx >  vx_limit) out_vx =  vx_limit;
+    if (out_vx < -vx_limit) out_vx = -vx_limit;
 
     /* 横向: 融合模式不使用蟹行, 仅向前 */
     float out_vy = 0.0f;
 
     if (fabsf(ros_vz) > 0.01f)
     {
-        /* ROS 有有效旋转指令 → 使用 ROS 避障规划 */
-        out_wz = ros_vz * ROS_VZ_SCALE;
+        /* 与室内ROS导航复用同一套可调缩放及限幅参数。 */
+        out_wz = ros_vz * chassis->remote.ros_vz_scale;
+        wz_limit = fabsf(chassis->remote.ros_max_wz);
     }
     else
     {
-        /* ROS 无指令 → GPS 航向 P 控 */
-        out_wz = angle_diff * Kp_yaw;
+        /*
+         * ROS 无旋转指令时使用磁力计/GPS回退。
+         * angle_diff沿用罗盘定义：右侧为正(CW+)；底盘Wz/ROS angular.z
+         * 则是左转为正(CCW+)，因此这里必须取反。
+         */
+        out_wz = -angle_diff * Kp_yaw;
     }
-    if (out_wz >  Max_wz) out_wz =  Max_wz;
-    if (out_wz < -Max_wz) out_wz = -Max_wz;
+    if (out_wz >  wz_limit) out_wz =  wz_limit;
+    if (out_wz < -wz_limit) out_wz = -wz_limit;
 
     /* 5. 输出到底盘结构体 */
     chassis->Vx_set = out_vx;

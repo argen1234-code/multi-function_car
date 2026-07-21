@@ -14,10 +14,13 @@
 #include "bsp_JY901S.h"
 #include "bsp_road_classification.h"
 #include "bsp_WonderEcho.h"
+#include "bsp_tf_image_load.h"
+#include "ff.h"
 #include "usart.h"
 #include "stm32h7xx_hal_flash_ex.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ---- Jetson timeout (ms); no valid frame within this period -> offline ---- */
@@ -50,10 +53,28 @@
 #define GPS_ROUTE_FLASH_CRC_OFFSET       172U
 #define GPS_ROUTE_FLASH_WORD_SIZE        32U
 
-/* ---- Runtime sampled GPS route; intentionally empty after each power-up. ---- */
+/* SD card is the primary, human-readable route store; Flash remains backup. */
+#define GPS_ROUTE_SD_DIR                 "0:/GPS"
+#define GPS_ROUTE_SD_FILE                "0:/GPS/GPSPTS.CSV"
+#define GPS_ROUTE_SD_TEMP                "0:/GPS/GPSPTS.TMP"
+#define GPS_ROUTE_SD_BUFFER_SIZE         1024U
+#define GPS_ROUTE_SD_LOCK_TICKS          20U
+#define GPS_ROUTE_SD_RETRY_MS            1000U
+#define GPS_ROUTE_SD_LOAD_OK             0U
+#define GPS_ROUTE_SD_LOAD_NOT_FOUND      1U
+#define GPS_ROUTE_SD_LOAD_ERROR          2U
+
+/* ---- Runtime GPS route; restored from SD primary storage or Flash backup. ---- */
 static GPS_Point_t chassis_gps_route[MAX_WAYPOINTS] = {0};
 static uint8_t chassis_gps_route_count = 0U;
 static __ALIGNED(32) uint32_t chassis_gps_route_flash_record_words[GPS_ROUTE_FLASH_RECORD_SIZE / sizeof(uint32_t)];
+static char chassis_gps_route_sd_buffer[GPS_ROUTE_SD_BUFFER_SIZE];
+static GPS_Point_t chassis_gps_route_sd_points[MAX_WAYPOINTS];
+static FIL chassis_gps_route_sd_file;
+static uint8_t chassis_gps_route_sd_sync_done = 0U;
+static uint8_t chassis_gps_route_sd_save_pending = 0U;
+static uint8_t chassis_gps_route_runtime_modified = 0U;
+static uint32_t chassis_gps_route_sd_last_retry_tick = 0U;
 
 /* Sole chassis instance; not directly accessible externally, only via pointer */
 chassis_move_t    chassis_move    = {0};
@@ -74,7 +95,13 @@ volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug = CHASSIS
 volatile ChassisGPSRouteStorageStatus_t g_chassis_gps_route_storage_status_debug = CHASSIS_GPS_ROUTE_STORAGE_NONE;
 volatile uint32_t g_chassis_gps_route_storage_sequence_debug = 0U;
 volatile uint8_t g_chassis_gps_route_storage_slot_debug = 0xFFU;
+volatile ChassisGPSRouteSDStatus_t g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_WAITING;
+volatile uint32_t g_chassis_gps_route_sd_save_count_debug = 0U;
+volatile uint32_t g_chassis_gps_route_sd_load_count_debug = 0U;
+volatile uint32_t g_chassis_gps_route_sd_delete_count_debug = 0U;
+volatile uint32_t g_chassis_gps_route_sd_last_fresult_debug = FR_OK;
 volatile uint8_t g_chassis_mag_initialized_debug = 0U;
+volatile uint8_t g_chassis_powerless_debug = 0U;
 
 /*
  * 全局可见的 JY901S 调试镜像。volatile 用于保证即使打开优化，Keil Watch 读取的
@@ -86,6 +113,8 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
 static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 static void chassis_load_gps_route_from_flash(void);
 static uint8_t chassis_save_gps_route_to_flash(void);
+static void chassis_persist_gps_route(void);
+static void chassis_service_gps_route_sd(chassis_move_t *chassis);
 static uint8_t chassis_add_remote_gps_point(chassis_move_t *chassis,
                                             const BT_RemotePoint_t *remote_point);
 
@@ -451,6 +480,23 @@ static void chassis_reset_control_smoothing(chassis_move_t *chassis)
     }
 }
 
+static void chassis_force_powerless_output(chassis_move_t *chassis)
+{
+    if (chassis != NULL)
+    {
+        chassis_stop(chassis);
+        chassis_clear_motor_output(chassis);
+        chassis_reset_control_smoothing(chassis);
+    }
+
+    /* TB6612 STBY is tied high. PWM=0 plus both direction inputs low gives coast. */
+    Motor_SetAllPWM(0, 0, 0, 0);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6 | GPIO_PIN_7, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4 | GPIO_PIN_5, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12 | GPIO_PIN_13 |
+                             GPIO_PIN_14 | GPIO_PIN_15, GPIO_PIN_RESET);
+}
+
 static uint32_t chassis_gps_route_crc32(const uint8_t *data, uint32_t size)
 {
     uint32_t crc = 0xFFFFFFFFU;
@@ -680,6 +726,393 @@ static uint8_t chassis_save_gps_route_to_flash(void)
     return 1U;
 }
 
+static char *chassis_gps_route_sd_next_line(char **cursor)
+{
+    char *line;
+    char *end;
+    size_t length;
+
+    if (cursor == NULL || *cursor == NULL || **cursor == '\0') return NULL;
+
+    line = *cursor;
+    end = strchr(line, '\n');
+    if (end != NULL)
+    {
+        *end = '\0';
+        *cursor = end + 1;
+    }
+    else
+    {
+        *cursor = line + strlen(line);
+    }
+
+    length = strlen(line);
+    if (length > 0U && line[length - 1U] == '\r') line[length - 1U] = '\0';
+    return line;
+}
+
+static uint8_t chassis_gps_route_sd_parse(uint8_t *count)
+{
+    char *cursor;
+    char *line;
+    char *end;
+    char *crc_line;
+    unsigned long parsed_count;
+    unsigned long parsed_index;
+    unsigned long stored_crc;
+    uint32_t calculated_crc;
+    uint32_t crc_length;
+    uint8_t i;
+    double lat;
+    double lon;
+
+    if (count == NULL) return 0U;
+
+    crc_line = strstr(chassis_gps_route_sd_buffer, "CRC32=");
+    if (crc_line == NULL ||
+        (crc_line != chassis_gps_route_sd_buffer && *(crc_line - 1) != '\n')) return 0U;
+
+    stored_crc = strtoul(crc_line + 6, &end, 16);
+    if (end == crc_line + 6 || (*end != '\r' && *end != '\n' && *end != '\0')) return 0U;
+    crc_length = (uint32_t)(crc_line - chassis_gps_route_sd_buffer);
+    calculated_crc = chassis_gps_route_crc32((const uint8_t *)chassis_gps_route_sd_buffer,
+                                              crc_length);
+    if ((uint32_t)stored_crc != calculated_crc) return 0U;
+
+    cursor = chassis_gps_route_sd_buffer;
+    line = chassis_gps_route_sd_next_line(&cursor);
+    if (line == NULL || strcmp(line, "GPS_ROUTE_V1") != 0) return 0U;
+
+    line = chassis_gps_route_sd_next_line(&cursor);
+    if (line == NULL || strncmp(line, "COUNT=", 6) != 0) return 0U;
+    parsed_count = strtoul(line + 6, &end, 10);
+    if (*end != '\0' || parsed_count > MAX_WAYPOINTS) return 0U;
+
+    line = chassis_gps_route_sd_next_line(&cursor);
+    if (line == NULL || strcmp(line, "INDEX,LATITUDE,LONGITUDE") != 0) return 0U;
+
+    for (i = 0U; i < (uint8_t)parsed_count; i++)
+    {
+        line = chassis_gps_route_sd_next_line(&cursor);
+        if (line == NULL) return 0U;
+
+        parsed_index = strtoul(line, &end, 10);
+        if (parsed_index != (unsigned long)i + 1UL || *end != ',') return 0U;
+
+        lat = strtod(end + 1, &end);
+        if (*end != ',') return 0U;
+        lon = strtod(end + 1, &end);
+        if (*end != '\0' || lat != lat || lon != lon ||
+            lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) return 0U;
+
+        chassis_gps_route_sd_points[i].lat = lat;
+        chassis_gps_route_sd_points[i].lon = lon;
+    }
+
+    line = chassis_gps_route_sd_next_line(&cursor);
+    if (line == NULL || strncmp(line, "CRC32=", 6) != 0) return 0U;
+
+    *count = (uint8_t)parsed_count;
+    return 1U;
+}
+
+static uint8_t chassis_load_gps_route_sd_file_locked(const char *path, uint8_t *count)
+{
+    FRESULT result;
+    FSIZE_t size;
+    UINT bytes_read = 0U;
+
+    if (path == NULL || count == NULL) return GPS_ROUTE_SD_LOAD_ERROR;
+
+    result = f_open(&chassis_gps_route_sd_file, path, FA_READ | FA_OPEN_EXISTING);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+    if (result == FR_NO_FILE || result == FR_NO_PATH) return GPS_ROUTE_SD_LOAD_NOT_FOUND;
+    if (result != FR_OK)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_OPEN_ERROR;
+        return GPS_ROUTE_SD_LOAD_ERROR;
+    }
+
+    size = f_size(&chassis_gps_route_sd_file);
+    if (size == 0U || size >= GPS_ROUTE_SD_BUFFER_SIZE)
+    {
+        f_close(&chassis_gps_route_sd_file);
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_FORMAT_ERROR;
+        return GPS_ROUTE_SD_LOAD_ERROR;
+    }
+
+    result = f_read(&chassis_gps_route_sd_file,
+                    chassis_gps_route_sd_buffer,
+                    (UINT)size,
+                    &bytes_read);
+    f_close(&chassis_gps_route_sd_file);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+    if (result != FR_OK || bytes_read != (UINT)size)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_READ_ERROR;
+        return GPS_ROUTE_SD_LOAD_ERROR;
+    }
+
+    chassis_gps_route_sd_buffer[bytes_read] = '\0';
+    if (!chassis_gps_route_sd_parse(count))
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_FORMAT_ERROR;
+        return GPS_ROUTE_SD_LOAD_ERROR;
+    }
+
+    return GPS_ROUTE_SD_LOAD_OK;
+}
+
+static uint8_t chassis_save_gps_route_to_sd_locked(void)
+{
+    FRESULT result;
+    UINT bytes_written = 0U;
+    uint32_t crc;
+    int written;
+    uint32_t offset = 0U;
+    uint8_t verify_count = 0U;
+    uint8_t i;
+
+    result = f_mkdir(GPS_ROUTE_SD_DIR);
+    if (result != FR_OK && result != FR_EXIST)
+    {
+        g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_OPEN_ERROR;
+        return 0U;
+    }
+
+    written = snprintf(chassis_gps_route_sd_buffer,
+                       GPS_ROUTE_SD_BUFFER_SIZE,
+                       "GPS_ROUTE_V1\r\nCOUNT=%u\r\nINDEX,LATITUDE,LONGITUDE\r\n",
+                       (unsigned)chassis_gps_route_count);
+    if (written < 0 || (uint32_t)written >= GPS_ROUTE_SD_BUFFER_SIZE) return 0U;
+    offset = (uint32_t)written;
+
+    for (i = 0U; i < chassis_gps_route_count; i++)
+    {
+        written = snprintf(&chassis_gps_route_sd_buffer[offset],
+                           GPS_ROUTE_SD_BUFFER_SIZE - offset,
+                           "%u,%.10f,%.10f\r\n",
+                           (unsigned)(i + 1U),
+                           chassis_gps_route[i].lat,
+                           chassis_gps_route[i].lon);
+        if (written < 0 || (uint32_t)written >= GPS_ROUTE_SD_BUFFER_SIZE - offset) return 0U;
+        offset += (uint32_t)written;
+    }
+
+    crc = chassis_gps_route_crc32((const uint8_t *)chassis_gps_route_sd_buffer, offset);
+    written = snprintf(&chassis_gps_route_sd_buffer[offset],
+                       GPS_ROUTE_SD_BUFFER_SIZE - offset,
+                       "CRC32=%08lX\r\n",
+                       (unsigned long)crc);
+    if (written < 0 || (uint32_t)written >= GPS_ROUTE_SD_BUFFER_SIZE - offset) return 0U;
+    offset += (uint32_t)written;
+
+    result = f_open(&chassis_gps_route_sd_file,
+                    GPS_ROUTE_SD_TEMP,
+                    FA_WRITE | FA_CREATE_ALWAYS);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+    if (result != FR_OK)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_OPEN_ERROR;
+        return 0U;
+    }
+
+    result = f_write(&chassis_gps_route_sd_file,
+                     chassis_gps_route_sd_buffer,
+                     (UINT)offset,
+                     &bytes_written);
+    if (result == FR_OK && bytes_written == (UINT)offset) result = f_sync(&chassis_gps_route_sd_file);
+    f_close(&chassis_gps_route_sd_file);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+    if (result != FR_OK || bytes_written != (UINT)offset)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_WRITE_ERROR;
+        return 0U;
+    }
+
+    if (chassis_load_gps_route_sd_file_locked(GPS_ROUTE_SD_TEMP, &verify_count) != GPS_ROUTE_SD_LOAD_OK ||
+        verify_count != chassis_gps_route_count)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_VERIFY_ERROR;
+        return 0U;
+    }
+
+    for (i = 0U; i < verify_count; i++)
+    {
+        if (fabs(chassis_gps_route_sd_points[i].lat - chassis_gps_route[i].lat) > 0.00000001 ||
+            fabs(chassis_gps_route_sd_points[i].lon - chassis_gps_route[i].lon) > 0.00000001)
+        {
+            g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_VERIFY_ERROR;
+            return 0U;
+        }
+    }
+
+    result = f_unlink(GPS_ROUTE_SD_FILE);
+    if (result != FR_OK && result != FR_NO_FILE && result != FR_NO_PATH)
+    {
+        g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_WRITE_ERROR;
+        return 0U;
+    }
+
+    result = f_rename(GPS_ROUTE_SD_TEMP, GPS_ROUTE_SD_FILE);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result;
+    if (result != FR_OK)
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_WRITE_ERROR;
+        return 0U;
+    }
+
+    g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_SAVED;
+    g_chassis_gps_route_sd_save_count_debug++;
+    return 1U;
+}
+
+static uint8_t chassis_delete_gps_route_from_sd_locked(void)
+{
+    FRESULT result_file;
+    FRESULT result_temp;
+
+    result_file = f_unlink(GPS_ROUTE_SD_FILE);
+    result_temp = f_unlink(GPS_ROUTE_SD_TEMP);
+    g_chassis_gps_route_sd_last_fresult_debug = (uint32_t)result_file;
+
+    if ((result_file != FR_OK && result_file != FR_NO_FILE && result_file != FR_NO_PATH) ||
+        (result_temp != FR_OK && result_temp != FR_NO_FILE && result_temp != FR_NO_PATH))
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_WRITE_ERROR;
+        return 0U;
+    }
+
+    g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_DELETED;
+    g_chassis_gps_route_sd_delete_count_debug++;
+    return 1U;
+}
+
+static void chassis_apply_gps_route_from_sd(chassis_move_t *chassis, uint8_t count)
+{
+    uint8_t i;
+
+    chassis_gps_route_count = count;
+    for (i = 0U; i < MAX_WAYPOINTS; i++)
+    {
+        if (i < count)
+        {
+            chassis_gps_route[i] = chassis_gps_route_sd_points[i];
+        }
+        else
+        {
+            chassis_gps_route[i].lat = 0.0;
+            chassis_gps_route[i].lon = 0.0;
+        }
+    }
+    g_chassis_gps_route_count_debug = count;
+
+    if (chassis != NULL &&
+        (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS))
+    {
+        if (count > 0U) Navigation_Set_Route_Loop(&chassis->nav, chassis_gps_route, count);
+        else Navigation_Stop(chassis);
+    }
+}
+
+static void chassis_persist_gps_route(void)
+{
+    uint8_t sd_saved = 0U;
+
+    chassis_gps_route_runtime_modified = 1U;
+    if (bsp_tf_fs_is_mounted() && bsp_tf_fs_lock(GPS_ROUTE_SD_LOCK_TICKS))
+    {
+        sd_saved = (chassis_gps_route_count > 0U) ?
+                   chassis_save_gps_route_to_sd_locked() :
+                   chassis_delete_gps_route_from_sd_locked();
+        bsp_tf_fs_unlock();
+    }
+    else
+    {
+        g_chassis_gps_route_sd_status_debug = bsp_tf_fs_is_mounted() ?
+                                               CHASSIS_GPS_ROUTE_SD_LOCK_ERROR :
+                                               CHASSIS_GPS_ROUTE_SD_FLASH_FALLBACK;
+    }
+
+    chassis_gps_route_sd_save_pending = sd_saved ? 0U : 1U;
+    (void)chassis_save_gps_route_to_flash();
+}
+
+static void chassis_service_gps_route_sd(chassis_move_t *chassis)
+{
+    uint32_t now;
+    uint8_t load_result;
+    uint8_t loaded_count = 0U;
+    uint8_t sd_saved;
+    uint8_t loaded_from_temp = 0U;
+
+    if (!bsp_tf_fs_is_mounted()) return;
+
+    now = HAL_GetTick();
+    if (chassis_gps_route_sd_sync_done && !chassis_gps_route_sd_save_pending) return;
+    if (chassis_gps_route_sd_sync_done &&
+        (now - chassis_gps_route_sd_last_retry_tick) < GPS_ROUTE_SD_RETRY_MS) return;
+    if (!bsp_tf_fs_lock(GPS_ROUTE_SD_LOCK_TICKS))
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_LOCK_ERROR;
+        return;
+    }
+
+    chassis_gps_route_sd_last_retry_tick = now;
+
+    if (chassis_gps_route_sd_sync_done || chassis_gps_route_runtime_modified)
+    {
+        sd_saved = (chassis_gps_route_count > 0U) ?
+                   chassis_save_gps_route_to_sd_locked() :
+                   chassis_delete_gps_route_from_sd_locked();
+        chassis_gps_route_sd_save_pending = sd_saved ? 0U : 1U;
+        chassis_gps_route_sd_sync_done = 1U;
+        bsp_tf_fs_unlock();
+        return;
+    }
+
+    load_result = chassis_load_gps_route_sd_file_locked(GPS_ROUTE_SD_FILE, &loaded_count);
+    if (load_result != GPS_ROUTE_SD_LOAD_OK)
+    {
+        load_result = chassis_load_gps_route_sd_file_locked(GPS_ROUTE_SD_TEMP, &loaded_count);
+        loaded_from_temp = (load_result == GPS_ROUTE_SD_LOAD_OK) ? 1U : 0U;
+    }
+
+    if (load_result == GPS_ROUTE_SD_LOAD_OK)
+    {
+        chassis_apply_gps_route_from_sd(chassis, loaded_count);
+        if (loaded_from_temp)
+        {
+            (void)f_unlink(GPS_ROUTE_SD_FILE);
+            (void)f_rename(GPS_ROUTE_SD_TEMP, GPS_ROUTE_SD_FILE);
+        }
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_LOADED;
+        g_chassis_gps_route_sd_load_count_debug++;
+        chassis_gps_route_sd_save_pending = 0U;
+    }
+    else if (chassis_gps_route_count > 0U)
+    {
+        sd_saved = chassis_save_gps_route_to_sd_locked();
+        chassis_gps_route_sd_save_pending = sd_saved ? 0U : 1U;
+        if (!sd_saved) g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_FLASH_FALLBACK;
+    }
+    else
+    {
+        g_chassis_gps_route_sd_status_debug = CHASSIS_GPS_ROUTE_SD_NOT_FOUND;
+        chassis_gps_route_sd_save_pending = 0U;
+    }
+
+    chassis_gps_route_sd_sync_done = 1U;
+    bsp_tf_fs_unlock();
+
+    if (load_result == GPS_ROUTE_SD_LOAD_OK)
+    {
+        (void)chassis_save_gps_route_to_flash();
+    }
+}
+
 static void chassis_clear_gps_route(chassis_move_t *chassis)
 {
     uint8_t i;
@@ -714,7 +1147,7 @@ static void chassis_clear_gps_route(chassis_move_t *chassis)
         chassis->nav.heading_error = 0.0f;
     }
 
-    (void)chassis_save_gps_route_to_flash();
+    chassis_persist_gps_route();
 }
 
 static uint8_t chassis_add_current_gps_point(chassis_move_t *chassis)
@@ -754,7 +1187,7 @@ static uint8_t chassis_add_current_gps_point(chassis_move_t *chassis)
                                   chassis_gps_route_count);
     }
 
-    (void)chassis_save_gps_route_to_flash();
+    chassis_persist_gps_route();
 
     return 1U;
 }
@@ -795,7 +1228,7 @@ static uint8_t chassis_add_remote_gps_point(chassis_move_t *chassis,
                                   chassis_gps_route_count);
     }
 
-    (void)chassis_save_gps_route_to_flash();
+    chassis_persist_gps_route();
     return 1U;
 }
 
@@ -1267,6 +1700,13 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms)
 
     now = HAL_GetTick();
 
+    if (BT_IsPowerless())
+    {
+        g_chassis_powerless_debug = 1U;
+        chassis_force_powerless_output(&chassis_move);
+        return;
+    }
+
     for (i = 0U; i < 4U; i++)
     {
         chassis_move.motor[i].speed = Encoder_Rpm_Get(i);
@@ -1297,7 +1737,8 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms)
 
 /* ============================================================
  *  Step 1: Chassis control mode arbitration.
- *  Priority: GUI request > Bluetooth > Manual hold > Voice > Jetson -> auto fallback to IDLE.
+ *  Priority: Bluetooth powerless latch > GUI request > Bluetooth > Manual hold
+ *            > Voice > Jetson -> auto fallback to IDLE.
  * ============================================================ */
 void chassis_mode_change(chassis_move_t *chassis)
 {
@@ -1308,6 +1749,16 @@ void chassis_mode_change(chassis_move_t *chassis)
     uint8_t jetson_mode;
 
     if (chassis == NULL) return;
+
+    g_chassis_powerless_debug = BT_IsPowerless();
+    if (g_chassis_powerless_debug)
+    {
+        gui_req_mode = -1;
+        chassis_manual_indoor_mode = 0U;
+        if (chassis->mode != CAR_MODE_IDLE) Chassis_SetMode(chassis, CAR_MODE_IDLE);
+        chassis_force_powerless_output(chassis);
+        return;
+    }
 
     if (BT_GetAndClearRemotePoint(&remote_point))
     {
@@ -1488,7 +1939,8 @@ static void chassis_apply_gain(chassis_move_t *chassis)
             break;
 
         case CAR_MODE_GPS:    gain = chassis->gain.gps;    break;
-        case CAR_MODE_GPS_ROS: gain = chassis->gain.gps;   break;
+        /* GPS+ROS uses the same ROS command gain as the proven indoor Nav2 path. */
+        case CAR_MODE_GPS_ROS: gain = chassis->gain.line;  break;
         case CAR_MODE_INDOOR: gain = chassis->gain.indoor; break;
         case CAR_MODE_REMOTE: gain = chassis->gain.remote; break;
         case CAR_MODE_LINE:   gain = chassis->gain.line;   break;
@@ -1511,6 +1963,13 @@ void chassis_set_control(chassis_move_t *chassis)
     uint8_t jetson_mode;
 
     if (chassis == NULL) return;
+
+    if (BT_IsPowerless())
+    {
+        g_chassis_powerless_debug = 1U;
+        chassis_force_powerless_output(chassis);
+        return;
+    }
 
     jetson_online = chassis_is_jetson_online(chassis);
     jetson_mode = chassis->cmd_vel.mode;
@@ -1607,6 +2066,16 @@ void chassis_send_cmd(chassis_move_t *chassis)
 
 	BT_ServicePendingAck();
 
+    if (BT_IsPowerless())
+    {
+        g_chassis_powerless_debug = 1U;
+        chassis_force_powerless_output(chassis);
+        USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
+                          chassis->date_to_usb.current_lat,
+                          chassis->date_to_usb.current_lon);
+        return;
+    }
+
     if (chassis->mode == CAR_MODE_IDLE)
     {
         chassis_reset_control_smoothing(chassis);
@@ -1661,6 +2130,7 @@ void chassis_task(void *pvParameters)
     while (1)
     {
         chassis_feedback_update(&chassis_move);   /* Sensors + USB data refresh */
+        chassis_service_gps_route_sd(&chassis_move); /* SD primary route store; Flash fallback */
 
         /*
          * 复用现有 10 ms 底盘任务，不创建新任务。BSP 只在 ACC、GYRO 均更新后

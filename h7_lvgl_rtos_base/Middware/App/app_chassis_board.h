@@ -303,6 +303,21 @@ typedef enum {
     CHASSIS_GPS_ROUTE_STORAGE_VERIFY_ERROR
 } ChassisGPSRouteStorageStatus_t;
 
+typedef enum {
+    CHASSIS_GPS_ROUTE_SD_WAITING = 0,
+    CHASSIS_GPS_ROUTE_SD_LOADED,
+    CHASSIS_GPS_ROUTE_SD_SAVED,
+    CHASSIS_GPS_ROUTE_SD_DELETED,
+    CHASSIS_GPS_ROUTE_SD_NOT_FOUND,
+    CHASSIS_GPS_ROUTE_SD_LOCK_ERROR,
+    CHASSIS_GPS_ROUTE_SD_OPEN_ERROR,
+    CHASSIS_GPS_ROUTE_SD_READ_ERROR,
+    CHASSIS_GPS_ROUTE_SD_WRITE_ERROR,
+    CHASSIS_GPS_ROUTE_SD_FORMAT_ERROR,
+    CHASSIS_GPS_ROUTE_SD_VERIFY_ERROR,
+    CHASSIS_GPS_ROUTE_SD_FLASH_FALLBACK
+} ChassisGPSRouteSDStatus_t;
+
 /* ============================================================
  *  External interface
  * ============================================================ */
@@ -325,7 +340,13 @@ extern volatile ChassisGPSRouteResult_t g_chassis_gps_route_last_result_debug;
 extern volatile ChassisGPSRouteStorageStatus_t g_chassis_gps_route_storage_status_debug;
 extern volatile uint32_t g_chassis_gps_route_storage_sequence_debug;
 extern volatile uint8_t g_chassis_gps_route_storage_slot_debug;
+extern volatile ChassisGPSRouteSDStatus_t g_chassis_gps_route_sd_status_debug;
+extern volatile uint32_t g_chassis_gps_route_sd_save_count_debug;
+extern volatile uint32_t g_chassis_gps_route_sd_load_count_debug;
+extern volatile uint32_t g_chassis_gps_route_sd_delete_count_debug;
+extern volatile uint32_t g_chassis_gps_route_sd_last_fresult_debug;
 extern volatile uint8_t g_chassis_mag_initialized_debug;
+extern volatile uint8_t g_chassis_powerless_debug;
 
 /* Main loop 5 steps (defined here for external module replacement) */
 extern void chassis_mode_change(chassis_move_t *chassis);

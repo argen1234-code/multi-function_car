@@ -82,7 +82,7 @@ typedef struct
     uint8_t  frame_active;          /* Parser has seen '@'. */
     uint8_t  frame_saw_cr;          /* Parser is waiting for LF. */
     uint8_t  frame_len;             /* Current partial payload length. */
-    uint8_t  reserved0;
+    uint8_t  powerless_latched;    /* @! enters; @~, @resume or @power_on clears it. */
     char     last_payload[BT_DEBUG_PAYLOAD_MAX_LEN];
     uint8_t  last_payload_len;
 
@@ -111,6 +111,7 @@ BT_Motion_t    BT_GetMotion(void);
 uint8_t        BT_IsActive(void);
 uint8_t        BT_IsOnline(void);
 uint8_t        BT_GetKeyState(void);
+uint8_t        BT_IsPowerless(void);
 BT_ModeReq_t   BT_GetAndClearModeReq(void);
 uint8_t        BT_GetAndClearRemotePoint(BT_RemotePoint_t *point);
 void           BT_ReportRemotePointResult(uint8_t success);

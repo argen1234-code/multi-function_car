@@ -44,6 +44,8 @@ static lv_obj_t *gps_route_box = NULL;
 static lv_obj_t *gps_status = NULL;
 static lv_obj_t *gps_markers[MAX_WAYPOINTS] = {NULL};
 static lv_obj_t *gps_marker_labels[MAX_WAYPOINTS] = {NULL};
+static int gps_marker_indices[MAX_WAYPOINTS] = {0};
+static int gps_selected_wp_index = -1;
 static lv_obj_t *gps_route_lines[MAX_WAYPOINTS - 1] = {NULL};
 static lv_point_t gps_route_line_points[MAX_WAYPOINTS - 1][2];
 static lv_obj_t *gps_active_line = NULL;
@@ -224,10 +226,11 @@ static void gps_route_refresh(void)
 	uint8_t active = detail_data.gps_current_wp_index;
 	int arrived = -1;
 	uint8_t i;
-	char buf[256];
+	char buf[512];
 	const char *phase_text = "\xE8\xB7\xAF\xE7\xBA\xBF\xE5\xB0\xB1\xE7\xBB\xAA";
 
 	if (count > MAX_WAYPOINTS) count = MAX_WAYPOINTS;
+	if (gps_selected_wp_index >= (int)count) gps_selected_wp_index = -1;
 	for (i = 0U; i < MAX_WAYPOINTS; i++) {
 		if (gps_markers[i]) lv_obj_add_flag(gps_markers[i], LV_OBJ_FLAG_HIDDEN);
 		if (i < MAX_WAYPOINTS - 1U && gps_route_lines[i]) lv_obj_add_flag(gps_route_lines[i], LV_OBJ_FLAG_HIDDEN);
@@ -237,6 +240,7 @@ static void gps_route_refresh(void)
 	gps_arrow_refresh(0, 0, 0, 0, 0U);
 
 	if (count == 0U) {
+		gps_selected_wp_index = -1;
 		if (gps_status) {
 			snprintf(buf, sizeof(buf),
 			         "\xE8\xB7\xAF\xE5\xBE\x84\xE5\xBE\x85\xE5\x91\xBD\n\n\xE9\x87\x87\xE7\x82\xB9  0 / %u\nGPS   %s\n\xE5\x8D\xAB\xE6\x98\x9F  %u\n\n\xE7\xBA\xAC\xE5\xBA\xA6  %.5f\n\xE7\xBB\x8F\xE5\xBA\xA6  %.5f\n\n\xE9\x87\x87\xE9\x9B\x86\xE6\x96\xB0\xE7\x82\xB9\xE5\x90\x8E\xE5\xB0\x86\xE8\x87\xAA\xE5\x8A\xA8\n\xE6\x89\xA9\xE5\xB1\x95\xE5\xB7\xA1\xE8\x88\xAA\xE8\xB7\xAF\xE5\xBE\x84\xE3\x80\x82",
@@ -287,7 +291,11 @@ static void gps_route_refresh(void)
 		lv_obj_set_style_bg_color(gps_markers[i],
 		                          lv_color_hex(((int)i == arrived) ? UI_COLOR_ORANGE :
 		                                       (i == active ? UI_COLOR_CYAN : UI_COLOR_CARD)), 0);
-		lv_obj_set_style_border_color(gps_markers[i], lv_color_hex(UI_COLOR_CYAN_DARK), 0);
+		lv_obj_set_style_border_width(gps_markers[i],
+		                              ((int)i == gps_selected_wp_index) ? 5 : 3, 0);
+		lv_obj_set_style_border_color(gps_markers[i],
+		                              lv_color_hex(((int)i == gps_selected_wp_index) ?
+		                                           UI_COLOR_BLUE_DARK : UI_COLOR_CYAN_DARK), 0);
 		lv_obj_set_style_text_color(gps_marker_labels[i],
 		                            lv_color_hex(((int)i == arrived || i == active) ? UI_COLOR_BG : UI_COLOR_TEXT), 0);
 		lv_obj_clear_flag(gps_markers[i], LV_OBJ_FLAG_HIDDEN);
@@ -313,20 +321,51 @@ static void gps_route_refresh(void)
 	else if (detail_data.gps_is_navigating) phase_text = "\xE5\xB7\xA1\xE8\x88\xAA\xE4\xB8\xAD";
 	else phase_text = "\xE8\xB7\xAF\xE7\xBA\xBF\xE5\xB0\xB1\xE7\xBB\xAA";
 	if (gps_status) {
-		snprintf(buf, sizeof(buf),
-		         "%s\n\n\xE9\x87\x87\xE7\x82\xB9  %u / %u\n\xE7\x9B\xAE\xE6\xA0\x87  P%u\n\xE5\xBE\xAA\xE7\x8E\xAF  %s\n\n\xE8\xB7\x9D\xE7\xA6\xBB  %.1f m\n\xE8\x88\xAA\xE5\x90\x91\xE5\xB7\xAE  %+.1f \xE5\xBA\xA6\nGPS   %s / %u \xE6\x98\x9F\n\n\xE7\xBA\xAC\xE5\xBA\xA6  %.5f\n\xE7\xBB\x8F\xE5\xBA\xA6  %.5f",
-		         phase_text,
-		         (unsigned)count, (unsigned)MAX_WAYPOINTS,
-		         (unsigned)((active < count) ? active + 1U : count),
-		         detail_data.gps_loop_enable ? "\xE5\xBC\x80\xE5\x90\xAF" : "\xE5\x85\xB3\xE9\x97\xAD",
-		         detail_data.gps_distance_error,
-		         detail_data.gps_heading_error,
-		         sensor_tick_online(detail_data.gps_last_update_tick, GPS_TIMEOUT_MS) ? "\xE5\x9C\xA8\xE7\xBA\xBF" : "\xE7\xA6\xBB\xE7\xBA\xBF",
-		         (unsigned)detail_data.gps_sats,
-		         detail_data.gps_lat,
-		         detail_data.gps_lon);
+		if (gps_selected_wp_index >= 0) {
+			GPS_Point_t *selected = &detail_data.gps_route[gps_selected_wp_index];
+
+			snprintf(buf, sizeof(buf),
+			         "%s\n\n\xE9\x87\x87\xE7\x82\xB9  %u / %u\n\xE7\x9B\xAE\xE6\xA0\x87  P%u\n\xE5\xBE\xAA\xE7\x8E\xAF  %s\n\n\xE8\xB7\x9D\xE7\xA6\xBB  %.1f m\n\xE8\x88\xAA\xE5\x90\x91\xE5\xB7\xAE  %+.1f \xE5\xBA\xA6\nGPS   %s / %u \xE6\x98\x9F\n\n\xE7\xBA\xAC\xE5\xBA\xA6  %.5f\n\xE7\xBB\x8F\xE5\xBA\xA6  %.5f\n\n> \xE8\x88\xAA\xE7\x82\xB9 P%u\n\xE7\xBA\xAC\xE5\xBA\xA6 %.8f\n\xE7\xBB\x8F\xE5\xBA\xA6 %.8f",
+			         phase_text,
+			         (unsigned)count, (unsigned)MAX_WAYPOINTS,
+			         (unsigned)((active < count) ? active + 1U : count),
+			         detail_data.gps_loop_enable ? "\xE5\xBC\x80\xE5\x90\xAF" : "\xE5\x85\xB3\xE9\x97\xAD",
+			         detail_data.gps_distance_error,
+			         detail_data.gps_heading_error,
+			         sensor_tick_online(detail_data.gps_last_update_tick, GPS_TIMEOUT_MS) ? "\xE5\x9C\xA8\xE7\xBA\xBF" : "\xE7\xA6\xBB\xE7\xBA\xBF",
+			         (unsigned)detail_data.gps_sats,
+			         detail_data.gps_lat,
+			         detail_data.gps_lon,
+			         (unsigned)(gps_selected_wp_index + 1),
+			         selected->lat,
+			         selected->lon);
+		} else {
+			snprintf(buf, sizeof(buf),
+			         "%s\n\n\xE9\x87\x87\xE7\x82\xB9  %u / %u\n\xE7\x9B\xAE\xE6\xA0\x87  P%u\n\xE5\xBE\xAA\xE7\x8E\xAF  %s\n\n\xE8\xB7\x9D\xE7\xA6\xBB  %.1f m\n\xE8\x88\xAA\xE5\x90\x91\xE5\xB7\xAE  %+.1f \xE5\xBA\xA6\nGPS   %s / %u \xE6\x98\x9F\n\n\xE7\xBA\xAC\xE5\xBA\xA6  %.5f\n\xE7\xBB\x8F\xE5\xBA\xA6  %.5f",
+			         phase_text,
+			         (unsigned)count, (unsigned)MAX_WAYPOINTS,
+			         (unsigned)((active < count) ? active + 1U : count),
+			         detail_data.gps_loop_enable ? "\xE5\xBC\x80\xE5\x90\xAF" : "\xE5\x85\xB3\xE9\x97\xAD",
+			         detail_data.gps_distance_error,
+			         detail_data.gps_heading_error,
+			         sensor_tick_online(detail_data.gps_last_update_tick, GPS_TIMEOUT_MS) ? "\xE5\x9C\xA8\xE7\xBA\xBF" : "\xE7\xA6\xBB\xE7\xBA\xBF",
+			         (unsigned)detail_data.gps_sats,
+			         detail_data.gps_lat,
+			         detail_data.gps_lon);
+		}
 		lv_label_set_text(gps_status, buf);
 	}
+}
+
+static void gps_marker_click_cb(lv_event_t *e)
+{
+	int *index = (int *)lv_event_get_user_data(e);
+
+	if (lv_event_get_code(e) != LV_EVENT_CLICKED || index == NULL) return;
+	if (*index < 0 || *index >= (int)detail_data.gps_route_count || *index >= MAX_WAYPOINTS) return;
+
+	gps_selected_wp_index = *index;
+	gps_route_refresh();
 }
 
 static void gps_route_create(lv_obj_t *parent)
@@ -369,12 +408,16 @@ static void gps_route_create(lv_obj_t *parent)
 	}
 
 	for (i = 0U; i < MAX_WAYPOINTS; i++) {
+		gps_marker_indices[i] = (int)i;
 		gps_markers[i] = lv_obj_create(gps_route_box);
 		lv_obj_set_size(gps_markers[i], 22, 22);
 		lv_obj_set_style_radius(gps_markers[i], LV_RADIUS_CIRCLE, 0);
 		lv_obj_set_style_border_width(gps_markers[i], 3, 0);
 		lv_obj_set_style_pad_all(gps_markers[i], 0, 0);
 		lv_obj_clear_flag(gps_markers[i], LV_OBJ_FLAG_SCROLLABLE);
+		lv_obj_add_flag(gps_markers[i], LV_OBJ_FLAG_CLICKABLE);
+		lv_obj_add_event_cb(gps_markers[i], gps_marker_click_cb, LV_EVENT_CLICKED,
+		                    &gps_marker_indices[i]);
 		gps_marker_labels[i] = lv_label_create(gps_markers[i]);
 		snprintf(buf, sizeof(buf), "%u", (unsigned)(i + 1U));
 		lv_label_set_text(gps_marker_labels[i], buf);
@@ -1061,6 +1104,7 @@ void ui_DataDetail_screen_destroy(void)
 	gps_status = NULL;
 	gps_active_line = NULL;
 	gps_vehicle_marker = NULL;
+	gps_selected_wp_index = -1;
 	gps_arrow_lines[0] = NULL;
 	gps_arrow_lines[1] = NULL;
 	wheel_motion = NULL;

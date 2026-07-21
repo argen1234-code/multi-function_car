@@ -28,6 +28,7 @@
 #include "my_lvgl_task.h"
 #include "app_chassis_board.h"
 #include "app_key.h"
+#include "bsp_tf_image_load.h"
 
 
 /* USER CODE END Includes */
@@ -96,6 +97,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
+	(void)bsp_tf_fs_lock_init();
 
   /* USER CODE END Init */
 
