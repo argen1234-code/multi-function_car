@@ -320,7 +320,7 @@ uint8_t BSP_RoadClassification_Init(void)
     return 1U;
 }
 
-void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data)
+void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data, uint8_t vehicle_moving)
 {
     uint32_t now;
     uint32_t input_offset;
@@ -334,6 +334,21 @@ void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data)
     }
 
     now = HAL_GetTick();
+
+    /*
+     * 停车期间不收集振动样本，也不保留停车前的类别。持续吞掉当前序号，确保重新
+     * 起步后必须等到 ACC/GYRO 都出现真正的新帧才开始一个全新的 32 帧窗口。
+     */
+    if (vehicle_moving == 0U)
+    {
+        s_last_collected_acc_sequence = imu_data->acc_update_sequence;
+        s_last_collected_gyro_sequence = imu_data->gyro_update_sequence;
+        if (s_collected_samples != 0U || s_result.state == BSP_ROAD_CLASSIFICATION_READY)
+        {
+            BSP_RoadClassification_ResetWindow();
+        }
+        return;
+    }
 
     /*
      * 调度频率为 10 ms，IMU 实际帧率约 9~10 Hz。若串口掉线或长期未更新，

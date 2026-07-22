@@ -27,6 +27,9 @@
 #define JETSON_TIMEOUT_MS  500U
 #define GPS_ONLINE_TIMEOUT_MS  3000U
 
+/* Encoder feedback threshold used to enable road classification. */
+#define ROAD_CLASSIFICATION_MOVING_SPEED_THRESHOLD  3.0
+
 /* ---- On-demand magnetometer calibration motion (ms / internal Wz units) ---- */
 #define MAG_CALIB_WZ                 50.0f
 #define MAG_CALIB_STILL_END_MS       2000U
@@ -110,6 +113,7 @@ volatile uint8_t g_chassis_powerless_debug = 0U;
 volatile ChassisJY901SDebug_t g_chassis_jy901s_debug;
 
 static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
+static uint8_t chassis_is_moving_for_road_classification(const chassis_move_t *chassis);
 static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 static void chassis_load_gps_route_from_flash(void);
 static uint8_t chassis_save_gps_route_to_flash(void);
@@ -1284,6 +1288,26 @@ static uint8_t chassis_is_jetson_online(chassis_move_t *chassis)
             (uint32_t)(HAL_GetTick() - chassis->jetson_last_tick) < JETSON_TIMEOUT_MS) ? 1U : 0U;
 }
 
+static uint8_t chassis_is_moving_for_road_classification(const chassis_move_t *chassis)
+{
+    uint8_t i;
+
+    if (chassis == NULL)
+    {
+        return 0U;
+    }
+
+    for (i = 0U; i < 4U; i++)
+    {
+        if (fabs(chassis->motor[i].speed) >= ROAD_CLASSIFICATION_MOVING_SPEED_THRESHOLD)
+        {
+            return 1U;
+        }
+    }
+
+    return 0U;
+}
+
 /*
  * Return 1 if the given year is a leap year, 0 otherwise.
  * Handles Gregorian rules: every 4th year, except centuries, but including every 400th.
@@ -2144,7 +2168,9 @@ void chassis_task(void *pvParameters)
          * 才接收一条六轴样本，收满 32 条才推理；它只写自己的结果快照，绝不写入
          * chassis_move 的速度、模式、PID 或电机控制字段。
          */
-        BSP_RoadClassification_Process(&chassis_move.imu.jy901s);
+        BSP_RoadClassification_Process(
+            &chassis_move.imu.jy901s,
+            chassis_is_moving_for_road_classification(&chassis_move));
 
         if (HAL_GetTick() - voice_tick >= 50U)
         {

@@ -128,12 +128,13 @@ extern volatile BSP_RoadClassificationDebug_t g_bsp_road_classification_debug;
 uint8_t BSP_RoadClassification_Init(void);
 
 /*
- * 由现有 chassis_task 每个控制周期调用。
+ * 由现有 chassis_task 每个控制周期调用。vehicle_moving 为 0 时立即清空半窗和
+ * 已发布结果；恢复运动后只接收新的 ACC/GYRO 帧，重新积满完整窗口才发布结果。
  * 函数只读取 IMU 数据和更新自身缓存；只有 ACC 与 GYRO 都出现新帧时才入窗，
  * 从而严格复现 jy901s_nanoedge_logger.py 的一行采样规则。它绝不修改电机、
  * PID、速度设定或运行模式。
  */
-void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data);
+void BSP_RoadClassification_Process(const JY901S_Data_t *imu_data, uint8_t vehicle_moving);
 
 /* 原子复制当前状态，供后续调试或界面模块按需读取。 */
 void BSP_RoadClassification_GetResult(BSP_RoadClassificationResult_t *result);

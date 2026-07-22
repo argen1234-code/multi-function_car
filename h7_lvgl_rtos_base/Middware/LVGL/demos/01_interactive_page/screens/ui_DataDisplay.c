@@ -22,7 +22,7 @@
 
 /* ARMCC5 source strings use explicit UTF-8 bytes for the LVGL Chinese font. */
 #define ROAD_TEXT_PREFIX       "\xE8\xB7\xAF\xE9\x9D\xA2: "
-#define ROAD_TEXT_NOT_STARTED  "\xE6\x9C\xAA\xE5\xBC\x80\xE5\xA7\x8B\xE8\xAF\x86\xE5\x88\xAB"
+#define ROAD_TEXT_NOT_STARTED  "\xE6\x9C\xAA\xE8\xAF\x86\xE5\x88\xAB"
 #define ROAD_TEXT_INDOORS      "\xE5\xAE\xA4\xE5\x86\x85\xE5\x9C\xB0\xE9\x9D\xA2"
 #define ROAD_TEXT_CEMENT       "\xE6\xB0\xB4\xE6\xB3\xA5\xE8\xB7\xAF"
 #define ROAD_TEXT_ASPHALT      "\xE6\x9F\x8F\xE6\xB2\xB9\xE8\xB7\xAF"
@@ -150,7 +150,7 @@ static const char *road_condition_get(void)
 			road_last_classification_tick = result.last_classification_tick;
 			road_model_result_valid = 1U;
 		}
-	} else if (road_model_result_valid) {
+	} else {
 		BT_SetRoadDisplay(BT_ROAD_DISPLAY_NOT_STARTED);
 		road_last_classification_tick = 0U;
 		road_model_result_valid = 0U;
