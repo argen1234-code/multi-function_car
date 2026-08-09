@@ -33,6 +33,25 @@ typedef struct {
     uint32_t update_sequence;
 } scene_cmd_t;
 
+typedef enum {
+    JETSON_GPS_ROUTE_NONE   = 0,
+    JETSON_GPS_ROUTE_BEGIN  = 1,
+    JETSON_GPS_ROUTE_POINT  = 2,
+    JETSON_GPS_ROUTE_COMMIT = 3,
+    JETSON_GPS_ROUTE_CLEAR  = 4
+} JetsonGpsRouteCommand_t;
+
+typedef struct {
+    JetsonGpsRouteCommand_t command;
+    uint8_t index;
+    uint8_t total;
+    uint8_t loop_enable;
+    double latitude;
+    double longitude;
+    uint32_t last_update_tick;
+    uint32_t update_sequence;
+} gps_route_cmd_t;
+
 #define USB_SENSOR_FLAG_GPS_VALID       0x01U
 #define USB_SENSOR_FLAG_MAG_VALID       0x02U
 #define USB_SENSOR_FLAG_IMU_VALID       0x04U
@@ -82,6 +101,7 @@ void       USB_Init(void);
 void       USB_ProcessRxData(uint8_t *pBuf, uint16_t Size);
 cmd_vel_t  USB_GetCmdVel(void);
 scene_cmd_t USB_GetSceneCmd(void);
+gps_route_cmd_t USB_GetGpsRouteCmd(void);
 void       USB_SendSensorTelemetry(const usb_sensor_telemetry_t *telemetry);
 
 #endif

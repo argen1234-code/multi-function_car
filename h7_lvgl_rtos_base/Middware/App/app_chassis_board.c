@@ -78,6 +78,11 @@ static uint8_t chassis_gps_route_sd_sync_done = 0U;
 static uint8_t chassis_gps_route_sd_save_pending = 0U;
 static uint8_t chassis_gps_route_runtime_modified = 0U;
 static uint32_t chassis_gps_route_sd_last_retry_tick = 0U;
+static GPS_Point_t chassis_usb_route_pending[MAX_WAYPOINTS];
+static uint16_t chassis_usb_route_received_mask = 0U;
+static uint8_t chassis_usb_route_expected_count = 0U;
+static uint8_t chassis_usb_route_loop_enable = 1U;
+static uint32_t chassis_usb_route_sequence = 0U;
 
 /* Sole chassis instance; not directly accessible externally, only via pointer */
 chassis_move_t    chassis_move    = {0};
@@ -118,6 +123,8 @@ static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 static void chassis_load_gps_route_from_flash(void);
 static uint8_t chassis_save_gps_route_to_flash(void);
 static void chassis_persist_gps_route(void);
+static void chassis_clear_gps_route(chassis_move_t *chassis);
+static void chassis_process_usb_gps_route(chassis_move_t *chassis);
 static void chassis_service_gps_route_sd(chassis_move_t *chassis);
 static uint8_t chassis_add_remote_gps_point(chassis_move_t *chassis,
                                             const BT_RemotePoint_t *remote_point);
@@ -1154,6 +1161,81 @@ static void chassis_clear_gps_route(chassis_move_t *chassis)
     chassis_persist_gps_route();
 }
 
+static void chassis_process_usb_gps_route(chassis_move_t *chassis)
+{
+    gps_route_cmd_t command = USB_GetGpsRouteCmd();
+    uint16_t expected_mask;
+    uint8_t i;
+
+    if (command.update_sequence == chassis_usb_route_sequence) return;
+    chassis_usb_route_sequence = command.update_sequence;
+
+    if (command.command == JETSON_GPS_ROUTE_CLEAR)
+    {
+        chassis_usb_route_expected_count = 0U;
+        chassis_usb_route_received_mask = 0U;
+        chassis_clear_gps_route(chassis);
+        return;
+    }
+
+    if (command.command == JETSON_GPS_ROUTE_BEGIN)
+    {
+        if (command.total == 0U || command.total > MAX_WAYPOINTS) return;
+        chassis_usb_route_expected_count = command.total;
+        chassis_usb_route_loop_enable = command.loop_enable ? 1U : 0U;
+        chassis_usb_route_received_mask = 0U;
+        memset(chassis_usb_route_pending, 0, sizeof(chassis_usb_route_pending));
+        return;
+    }
+
+    if (command.command == JETSON_GPS_ROUTE_POINT)
+    {
+        if (chassis_usb_route_expected_count == 0U ||
+            command.total != chassis_usb_route_expected_count ||
+            command.index >= chassis_usb_route_expected_count ||
+            command.latitude != command.latitude ||
+            command.longitude != command.longitude ||
+            command.latitude < -90.0 || command.latitude > 90.0 ||
+            command.longitude < -180.0 || command.longitude > 180.0) return;
+
+        chassis_usb_route_pending[command.index].lat = command.latitude;
+        chassis_usb_route_pending[command.index].lon = command.longitude;
+        chassis_usb_route_received_mask |= (uint16_t)(1U << command.index);
+        return;
+    }
+
+    if (command.command != JETSON_GPS_ROUTE_COMMIT ||
+        command.total != chassis_usb_route_expected_count ||
+        chassis_usb_route_expected_count == 0U) return;
+
+    expected_mask = (uint16_t)((1U << chassis_usb_route_expected_count) - 1U);
+    if (chassis_usb_route_received_mask != expected_mask) return;
+
+    chassis_gps_route_count = chassis_usb_route_expected_count;
+    for (i = 0U; i < MAX_WAYPOINTS; i++)
+    {
+        if (i < chassis_gps_route_count) chassis_gps_route[i] = chassis_usb_route_pending[i];
+        else
+        {
+            chassis_gps_route[i].lat = 0.0;
+            chassis_gps_route[i].lon = 0.0;
+        }
+    }
+    g_chassis_gps_route_count_debug = chassis_gps_route_count;
+    g_chassis_gps_route_last_result_debug = CHASSIS_GPS_ROUTE_RESULT_POINT_ADDED;
+
+    if (chassis != NULL && chassis->mode == CAR_MODE_GPS)
+    {
+        if (chassis_usb_route_loop_enable)
+            Navigation_Set_Route_Loop(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+        else
+            Navigation_Set_Route(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+    }
+    chassis_persist_gps_route();
+    chassis_usb_route_expected_count = 0U;
+    chassis_usb_route_received_mask = 0U;
+}
+
 static uint8_t chassis_add_current_gps_point(chassis_move_t *chassis)
 {
     PT_GNGGA gga;
@@ -1576,6 +1658,7 @@ void chassis_feedback_update(chassis_move_t *chassis)
              */
         }
     }
+    chassis_process_usb_gps_route(chassis);
     if (chassis->cmd_vel.last_update_tick != 0U)
     {
         chassis->jetson_last_tick = chassis->cmd_vel.last_update_tick;
@@ -2160,7 +2243,6 @@ static void chassis_send_sensor_telemetry(chassis_move_t *chassis)
             telemetry.flags |= USB_SENSOR_FLAG_GNSS_HEAD_VALID;
         }
     }
-
     if (chassis->imu.mag_last_update_tick != 0U &&
         (uint32_t)(now - chassis->imu.mag_last_update_tick) <= 1000U)
     {

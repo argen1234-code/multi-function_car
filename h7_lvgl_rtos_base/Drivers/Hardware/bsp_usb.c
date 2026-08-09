@@ -4,7 +4,8 @@
 
 #define CMD_VEL_FRAME_SIZE   12U
 #define SCENE_FRAME_SIZE      4U
-#define RX_FRAME_MAX_SIZE    CMD_VEL_FRAME_SIZE
+#define GPS_ROUTE_FRAME_SIZE 23U
+#define RX_FRAME_MAX_SIZE    GPS_ROUTE_FRAME_SIZE
 #define SENSOR_FRAME_VERSION   1U
 #define SENSOR_FRAME_SIZE    151U
 
@@ -13,6 +14,7 @@ static uint8_t   rx_idx = 0;
 static uint8_t   rx_expected_size = 0U;
 static cmd_vel_t cmd_vel = {0};
 static scene_cmd_t scene_cmd = {JETSON_SCENE_NONE, 0U, 0U};
+static gps_route_cmd_t gps_route_cmd = {JETSON_GPS_ROUTE_NONE, 0U, 0U, 0U, 0.0, 0.0, 0U, 0U};
 
 static void USB_RxReset(void)
 {
@@ -24,7 +26,9 @@ static void USB_RxStart(uint8_t header)
 {
     rx_buf[0] = header;
     rx_idx = 1U;
-    rx_expected_size = (header == 0xAAU) ? CMD_VEL_FRAME_SIZE : SCENE_FRAME_SIZE;
+    if (header == 0xAAU) rx_expected_size = CMD_VEL_FRAME_SIZE;
+    else if (header == 0xBBU) rx_expected_size = SCENE_FRAME_SIZE;
+    else rx_expected_size = GPS_ROUTE_FRAME_SIZE;
 }
 
 void USB_Init(void)
@@ -39,6 +43,8 @@ void USB_Init(void)
     scene_cmd.scene = JETSON_SCENE_NONE;
     scene_cmd.last_update_tick = 0U;
     scene_cmd.update_sequence = 0U;
+    gps_route_cmd.command = JETSON_GPS_ROUTE_NONE;
+    gps_route_cmd.update_sequence = 0U;
 }
 
 void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
@@ -49,10 +55,10 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
     {
         uint8_t byte = pBuf[i];
 
-        /* Byte 0 selects frame type: AA=cmd_vel, BB=scene_cmd. */
+        /* Byte 0 selects frame type: AA=cmd_vel, BB=scene, DD=GPS route. */
         if (rx_idx == 0U)
         {
-            if (byte == 0xAAU || byte == 0xBBU) USB_RxStart(byte);
+            if (byte == 0xAAU || byte == 0xBBU || byte == 0xDDU) USB_RxStart(byte);
             continue;
         }
 
@@ -61,7 +67,7 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
             if (byte != 0x55U)
             {
                 USB_RxReset();
-                if (byte == 0xAAU || byte == 0xBBU) USB_RxStart(byte);
+                if (byte == 0xAAU || byte == 0xBBU || byte == 0xDDU) USB_RxStart(byte);
                 continue;
             }
         }
@@ -88,7 +94,7 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 cmd_vel.last_update_tick = HAL_GetTick();
                 cmd_vel.update_sequence++;
             }
-            else
+            else if (frame_type == 0xBBU)
             {
                 /* scene_cmd XOR is exactly byte 2. Ignore unknown commands. */
                 if (rx_buf[3] != rx_buf[2]) continue;
@@ -98,6 +104,22 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 scene_cmd.scene = (JetsonScene_t)rx_buf[2];
                 scene_cmd.last_update_tick = HAL_GetTick();
                 scene_cmd.update_sequence++;
+            }
+            else
+            {
+                for (j = 2U; j < 22U; j++) checksum ^= rx_buf[j];
+                if (checksum != rx_buf[22]) continue;
+                if (rx_buf[2] < (uint8_t)JETSON_GPS_ROUTE_BEGIN ||
+                    rx_buf[2] > (uint8_t)JETSON_GPS_ROUTE_CLEAR) continue;
+
+                gps_route_cmd.command = (JetsonGpsRouteCommand_t)rx_buf[2];
+                gps_route_cmd.index = rx_buf[3];
+                gps_route_cmd.total = rx_buf[4];
+                gps_route_cmd.loop_enable = rx_buf[5] ? 1U : 0U;
+                memcpy(&gps_route_cmd.latitude, &rx_buf[6], sizeof(double));
+                memcpy(&gps_route_cmd.longitude, &rx_buf[14], sizeof(double));
+                gps_route_cmd.last_update_tick = HAL_GetTick();
+                gps_route_cmd.update_sequence++;
             }
         }
     }
@@ -117,6 +139,11 @@ static void USB_CopyFloat(uint8_t *buf, uint16_t *offset, float value)
 {
     memcpy(&buf[*offset], &value, sizeof(float));
     *offset = (uint16_t)(*offset + sizeof(float));
+}
+
+gps_route_cmd_t USB_GetGpsRouteCmd(void)
+{
+    return gps_route_cmd;
 }
 
 static void USB_CopyDouble(uint8_t *buf, uint16_t *offset, double value)
