@@ -7,12 +7,12 @@
 typedef enum {
     JETSON_MODE_GPS    = 1,   /* GPS + ROS 融合导航 */
     JETSON_MODE_REMOTE = 2,   /* 微信小程序遥控 */
-    JETSON_MODE_LINE   = 3    /* 巡线 (暂未实现) */
+    JETSON_MODE_INDOOR = 3    /* ROS/Nav2 室内导航 */
 } JetsonMode_t;
 
 /* Jetson 下发的 12 字节帧解析结果 */
 typedef struct {
-    uint8_t mode;    /* 1=GPS, 2=REMOTE, 3=LINE */
+    uint8_t mode;    /* 1=GPS, 2=REMOTE, 3=INDOOR */
     float   vx;      /* 线速度 (m/s), 正值前进 */
     float   vz;      /* 角速度 (rad/s), 正值左转 (Z轴向上) */
     uint32_t last_update_tick; /* Last checksum-valid cmd_vel frame tick. */

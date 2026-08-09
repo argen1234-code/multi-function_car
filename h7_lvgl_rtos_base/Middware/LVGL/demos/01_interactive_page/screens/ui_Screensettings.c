@@ -51,7 +51,7 @@ static const char *settings_mode_name(CarMode_t mode)
     case CAR_MODE_GPS:     return "GPS";
     case CAR_MODE_GPS_ROS: return "GPS+ROS";
     case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
-    case CAR_MODE_LINE:    return "ROS\xE5\xAE\xA4\xE5\x86\x85";
+    case CAR_MODE_ROS_INDOOR: return "ROS\xE5\xAE\xA4\xE5\x86\x85";
     case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";
     case CAR_MODE_VOICE:   return "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6";
     default:               return "--";
@@ -353,7 +353,7 @@ void ui_Screensettings_screen_init(void)
     settings_add_mode_button(tab_mode, "GPS+ROS", CAR_MODE_GPS_ROS, 200, 30);
     settings_add_mode_button(tab_mode, "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_INDOOR, 360, 30);
     settings_add_mode_button(tab_mode, "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_REMOTE, 520, 30);
-    settings_add_mode_button(tab_mode, "ROS\xE5\xAE\xA4\xE5\x86\x85", CAR_MODE_LINE, 680, 30);
+    settings_add_mode_button(tab_mode, "ROS\xE5\xAE\xA4\xE5\x86\x85", CAR_MODE_ROS_INDOOR, 680, 30);
     settings_add_mode_button(tab_mode, "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6", CAR_MODE_VOICE, 40, 92);
 
     settings_status_label = lv_label_create(tab_status);

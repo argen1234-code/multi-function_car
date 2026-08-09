@@ -122,7 +122,7 @@ static const char *mode_name_from_chassis(CarMode_t mode)
 	case CAR_MODE_GPS:     return "GPS\xE5\xAF\xBC\xE8\x88\xAA";
 	case CAR_MODE_GPS_ROS: return "GPS+ROS";
 	case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
-	case CAR_MODE_LINE:    return "ROS\xE5\xAE\xA4\xE5\x86\x85";
+	case CAR_MODE_ROS_INDOOR: return "ROS\xE5\xAE\xA4\xE5\x86\x85";
 	case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";
 	case CAR_MODE_VOICE:   return "\xE8\xAF\xAD\xE9\x9F\xB3\xE6\x8E\xA7\xE5\x88\xB6";
 	default:               return "--";

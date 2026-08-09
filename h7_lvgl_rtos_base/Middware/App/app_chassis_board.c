@@ -1445,8 +1445,8 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode)
         case CAR_MODE_REMOTE:
             return (jetson_online && jetson_mode == JETSON_MODE_REMOTE) ? 1U : 0U;
 
-        case CAR_MODE_LINE:
-            return (jetson_online && jetson_mode == JETSON_MODE_LINE) ? 1U : 0U;
+        case CAR_MODE_ROS_INDOOR:
+            return (jetson_online && jetson_mode == JETSON_MODE_INDOOR) ? 1U : 0U;
 
         case CAR_MODE_INDOOR:
             return chassis_is_bt_online();
@@ -1928,11 +1928,11 @@ void chassis_mode_change(chassis_move_t *chassis)
             return;
         }
 
-        if (jetson_mode == JETSON_MODE_LINE)
+        if (jetson_mode == JETSON_MODE_INDOOR)
         {
-            if (chassis_mode_available(chassis, CAR_MODE_LINE) && chassis->mode != CAR_MODE_LINE)
+            if (chassis_mode_available(chassis, CAR_MODE_ROS_INDOOR) && chassis->mode != CAR_MODE_ROS_INDOOR)
             {
-                Chassis_SetMode(chassis, CAR_MODE_LINE);
+                Chassis_SetMode(chassis, CAR_MODE_ROS_INDOOR);
             }
             return;
         }
@@ -1947,7 +1947,7 @@ void chassis_mode_change(chassis_move_t *chassis)
         }
     }
 
-    if (chassis->mode == CAR_MODE_REMOTE || chassis->mode == CAR_MODE_LINE)
+    if (chassis->mode == CAR_MODE_REMOTE || chassis->mode == CAR_MODE_ROS_INDOOR)
     {
         Chassis_SetMode(chassis, CAR_MODE_IDLE);
     }
@@ -1974,7 +1974,7 @@ static void chassis_apply_gain(chassis_move_t *chassis)
         case CAR_MODE_GPS_ROS: gain = chassis->gain.line;  break;
         case CAR_MODE_INDOOR: gain = chassis->gain.indoor; break;
         case CAR_MODE_REMOTE: gain = chassis->gain.remote; break;
-        case CAR_MODE_LINE:   gain = chassis->gain.line;   break;
+        case CAR_MODE_ROS_INDOOR: gain = chassis->gain.line; break;
         case CAR_MODE_VOICE:  gain = chassis->gain.voice;  break;
         default: break;
     }
@@ -2033,8 +2033,8 @@ void chassis_set_control(chassis_move_t *chassis)
             }
             break;
 
-        case CAR_MODE_LINE:
-            if (jetson_online && jetson_mode == JETSON_MODE_LINE)
+        case CAR_MODE_ROS_INDOOR:
+            if (jetson_online && jetson_mode == JETSON_MODE_INDOOR)
             {
                 Remote_ROS_Update(chassis);
             }
