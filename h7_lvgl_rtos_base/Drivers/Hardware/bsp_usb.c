@@ -110,7 +110,7 @@ void USB_ProcessRxData(uint8_t *pBuf, uint16_t Size)
                 for (j = 2U; j < 22U; j++) checksum ^= rx_buf[j];
                 if (checksum != rx_buf[22]) continue;
                 if (rx_buf[2] < (uint8_t)JETSON_GPS_ROUTE_BEGIN ||
-                    rx_buf[2] > (uint8_t)JETSON_GPS_ROUTE_CLEAR) continue;
+                    rx_buf[2] > (uint8_t)JETSON_GPS_ROUTE_SPEED) continue;
 
                 gps_route_cmd.command = (JetsonGpsRouteCommand_t)rx_buf[2];
                 gps_route_cmd.index = rx_buf[3];

@@ -58,6 +58,7 @@ struct chassis_move_s;
 void Navigation_Set_Target(Navigation_State_t *nav, double target_lat, double target_lon);
 void Navigation_Set_Route(Navigation_State_t *nav, GPS_Point_t *waypoints, uint8_t count);
 void Navigation_Set_Route_Loop(Navigation_State_t *nav, GPS_Point_t *waypoints, uint8_t count);
+void Navigation_Set_Speed_Percent(uint8_t speed_percent);
 
 /* ---- 导航控制 (需要底盘指针以读取IMU / 写入VxVyWz) ---- */
 void Navigation_Stop(struct chassis_move_s *chassis);

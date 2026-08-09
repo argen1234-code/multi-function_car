@@ -38,7 +38,8 @@ typedef enum {
     JETSON_GPS_ROUTE_BEGIN  = 1,
     JETSON_GPS_ROUTE_POINT  = 2,
     JETSON_GPS_ROUTE_COMMIT = 3,
-    JETSON_GPS_ROUTE_CLEAR  = 4
+    JETSON_GPS_ROUTE_CLEAR  = 4,
+    JETSON_GPS_ROUTE_SPEED  = 5
 } JetsonGpsRouteCommand_t;
 
 typedef struct {

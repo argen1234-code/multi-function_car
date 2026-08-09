@@ -1170,6 +1170,16 @@ static void chassis_process_usb_gps_route(chassis_move_t *chassis)
     if (command.update_sequence == chassis_usb_route_sequence) return;
     chassis_usb_route_sequence = command.update_sequence;
 
+    if (command.command == JETSON_GPS_ROUTE_SPEED)
+    {
+        float speed_percent = (float)command.latitude;
+        if (speed_percent != speed_percent) return;
+        if (speed_percent < 20.0f) speed_percent = 20.0f;
+        if (speed_percent > 100.0f) speed_percent = 100.0f;
+        Navigation_Set_Speed_Percent((uint8_t)(speed_percent + 0.5f));
+        return;
+    }
+
     if (command.command == JETSON_GPS_ROUTE_CLEAR)
     {
         chassis_usb_route_expected_count = 0U;

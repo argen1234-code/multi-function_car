@@ -17,6 +17,16 @@ static float Kp_yaw  = 0.5f;      /* 角度误差 → 角速度 比例 */
 static float Max_wz  = 18.0f;     /* 最大旋转角速度限制 */
 //static float Max_wz  = 0.0f;     /* 最大旋转角速度限制 */
 /* Keil Watch-only navigation mirror; no control code reads it back. */
+
+void Navigation_Set_Speed_Percent(uint8_t speed_percent)
+{
+    if (speed_percent < 20U) speed_percent = 20U;
+    if (speed_percent > 100U) speed_percent = 100U;
+
+    /* 纯GPS底盘低于Min_speed无法可靠起步，将20~100%映射到可用区间。 */
+    Max_speed = Min_speed + (100.0f - Min_speed) * ((float)speed_percent / 100.0f);
+}
+
 static void Navigation_DebugSync(struct chassis_move_s *chassis, uint8_t navigation_mode)
 {
     Navigation_State_t *nav;
