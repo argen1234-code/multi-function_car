@@ -65,8 +65,13 @@ void Remote_ROS_Update(chassis_move_t *chassis)
     float out_vx = chassis->cmd_vel.vx * vx_scale;
     float out_wz = chassis->cmd_vel.vz * vz_scale;
 
-    if (out_vx >  max_vx) out_vx =  max_vx;
-    if (out_vx < 0.0f)    out_vx = 0.0f;
+    /*
+     * ROS +X forward is converted by the Jetson serial bridge to the
+     * chassis convention, where forward Vx is negative.
+     * Indoor Nav2 is forward-only, so reject positive (reverse) commands.
+     */
+    if (out_vx < -max_vx) out_vx = -max_vx;
+    if (out_vx > 0.0f)    out_vx = 0.0f;
     if (out_wz >  max_wz) out_wz =  max_wz;
     if (out_wz < -max_wz) out_wz = -max_wz;
 
