@@ -119,8 +119,8 @@ static const char *mode_name_from_chassis(CarMode_t mode)
 {
 	switch (mode) {
 	case CAR_MODE_IDLE:    return "\xE6\x9C\xAA\xE4\xB8\x8A\xE7\x94\xB5";
-	case CAR_MODE_GPS:     return "GPS\xE5\xAF\xBC\xE8\x88\xAA";
-	case CAR_MODE_GPS_ROS: return "GPS+ROS";
+	case CAR_MODE_GPS:     return "GPS ONLY";
+	case CAR_MODE_GPS_ROS: return "GPS+ROS FUSION";
 	case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
 	case CAR_MODE_ROS_INDOOR: return "ROS\xE5\xAE\xA4\xE5\x86\x85";
 	case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";

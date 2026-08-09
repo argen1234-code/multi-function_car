@@ -114,7 +114,7 @@ typedef struct {
 typedef enum {
     CAR_MODE_IDLE = 0,          /* Idle (all control sources offline) */
     CAR_MODE_GPS,               /* GPS-only navigation (no ROS fusion) */
-    CAR_MODE_GPS_ROS,           /* GPS + ROS fusion navigation (auto-upgrade when Jetson online) */
+    CAR_MODE_GPS_ROS,           /* Jetson-controlled GPS + ROS fusion navigation */
     CAR_MODE_REMOTE,            /* WeChat mini-program remote (via Jetson) */
     CAR_MODE_ROS_INDOOR,        /* ROS/Nav2 indoor autonomous navigation */
     CAR_MODE_INDOOR,            /* Bluetooth remote control */

@@ -48,8 +48,8 @@ static const char *settings_mode_name(CarMode_t mode)
 {
     switch (mode) {
     case CAR_MODE_IDLE:    return "\xE6\x9C\xAA\xE4\xB8\x8A\xE7\x94\xB5";
-    case CAR_MODE_GPS:     return "GPS";
-    case CAR_MODE_GPS_ROS: return "GPS+ROS";
+    case CAR_MODE_GPS:     return "GPS ONLY";
+    case CAR_MODE_GPS_ROS: return "GPS+ROS FUSION";
     case CAR_MODE_REMOTE:  return "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7";
     case CAR_MODE_ROS_INDOOR: return "ROS\xE5\xAE\xA4\xE5\x86\x85";
     case CAR_MODE_INDOOR:  return "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7";
@@ -349,8 +349,8 @@ void ui_Screensettings_screen_init(void)
     settings_add_slider(tab_pid, "\xE9\x80\x9F\xE5\xBA\xA6 KD", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_KD, 0.0f, 1.0f, 100U);
     settings_add_slider(tab_pid, "PID\xE6\x9C\x80\xE5\xA4\xA7\xE8\xBE\x93\xE5\x87\xBA", SETTINGS_TYPE_PID, CHASSIS_PID_PARAM_MAX_OUT, 0.0f, 300.0f, 1U);
 
-    settings_add_mode_button(tab_mode, "GPS", CAR_MODE_GPS, 40, 30);
-    settings_add_mode_button(tab_mode, "GPS+ROS", CAR_MODE_GPS_ROS, 200, 30);
+    settings_add_mode_button(tab_mode, "GPS ONLY", CAR_MODE_GPS, 40, 30);
+    settings_add_mode_button(tab_mode, "GPS+ROS FUSION", CAR_MODE_GPS_ROS, 200, 30);
     settings_add_mode_button(tab_mode, "\xE8\x93\x9D\xE7\x89\x99\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_INDOOR, 360, 30);
     settings_add_mode_button(tab_mode, "\xE5\xBE\xAE\xE4\xBF\xA1\xE9\x81\xA5\xE6\x8E\xA7", CAR_MODE_REMOTE, 520, 30);
     settings_add_mode_button(tab_mode, "ROS\xE5\xAE\xA4\xE5\x86\x85", CAR_MODE_ROS_INDOOR, 680, 30);

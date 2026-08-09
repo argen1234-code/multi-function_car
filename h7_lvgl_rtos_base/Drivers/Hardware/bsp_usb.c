@@ -5,7 +5,8 @@
 #define CMD_VEL_FRAME_SIZE   12U
 #define SCENE_FRAME_SIZE      4U
 #define RX_FRAME_MAX_SIZE    CMD_VEL_FRAME_SIZE
-#define TELEM_FRAME_SIZE     15U
+#define SENSOR_FRAME_VERSION   1U
+#define SENSOR_FRAME_SIZE    151U
 
 static uint8_t   rx_buf[RX_FRAME_MAX_SIZE];
 static uint8_t   rx_idx = 0;
@@ -112,20 +113,69 @@ cmd_vel_t USB_GetCmdVel(void)
     return cmd_vel;
 }
 
-void USB_SendTelemetry(float heading_to_target_deg,
-                       float current_lat,
-                       float current_lon)
+static void USB_CopyFloat(uint8_t *buf, uint16_t *offset, float value)
 {
-    uint8_t buf[TELEM_FRAME_SIZE];
-    buf[0] = 0xAA;
-    buf[1] = 0x55;
-    memcpy(&buf[2],  &heading_to_target_deg, 4);
-    memcpy(&buf[6],  &current_lat,           4);
-    memcpy(&buf[10], &current_lon,           4);
+    memcpy(&buf[*offset], &value, sizeof(float));
+    *offset = (uint16_t)(*offset + sizeof(float));
+}
 
-    uint8_t checksum = 0;
-    for (uint8_t i = 2; i < 14; i++) checksum ^= buf[i];
-    buf[14] = checksum;
+static void USB_CopyDouble(uint8_t *buf, uint16_t *offset, double value)
+{
+    memcpy(&buf[*offset], &value, sizeof(double));
+    *offset = (uint16_t)(*offset + sizeof(double));
+}
 
-    CDC_Transmit_FS(buf, TELEM_FRAME_SIZE);
+void USB_SendSensorTelemetry(const usb_sensor_telemetry_t *telemetry)
+{
+    uint8_t buf[SENSOR_FRAME_SIZE];
+    uint16_t offset = 0U;
+    uint8_t checksum = 0U;
+    uint16_t i;
+
+    if (telemetry == NULL) return;
+
+    buf[offset++] = 0xCCU;
+    buf[offset++] = 0x55U;
+    buf[offset++] = SENSOR_FRAME_VERSION;
+    buf[offset++] = telemetry->flags;
+    buf[offset++] = telemetry->car_mode;
+    buf[offset++] = telemetry->satellites;
+    buf[offset++] = telemetry->fix_quality;
+    buf[offset++] = telemetry->route_total;
+    buf[offset++] = telemetry->route_slot;
+    buf[offset++] = telemetry->navigation_active;
+    buf[offset++] = telemetry->heading_status;
+    buf[offset++] = telemetry->loop_enable;
+    memcpy(&buf[offset], &telemetry->sequence, sizeof(uint16_t));
+    offset = (uint16_t)(offset + sizeof(uint16_t));
+
+    USB_CopyDouble(buf, &offset, telemetry->latitude);
+    USB_CopyDouble(buf, &offset, telemetry->longitude);
+    USB_CopyDouble(buf, &offset, telemetry->altitude);
+    USB_CopyFloat(buf, &offset, telemetry->gnss_heading);
+    USB_CopyFloat(buf, &offset, telemetry->gnss_speed);
+    USB_CopyFloat(buf, &offset, telemetry->velocity_north);
+    USB_CopyFloat(buf, &offset, telemetry->velocity_east);
+    USB_CopyFloat(buf, &offset, telemetry->mag_yaw);
+    USB_CopyFloat(buf, &offset, telemetry->mag_pitch);
+    USB_CopyFloat(buf, &offset, telemetry->mag_roll);
+    USB_CopyFloat(buf, &offset, telemetry->imu_roll);
+    USB_CopyFloat(buf, &offset, telemetry->imu_pitch);
+    USB_CopyFloat(buf, &offset, telemetry->imu_yaw);
+    USB_CopyFloat(buf, &offset, telemetry->gyro_x);
+    USB_CopyFloat(buf, &offset, telemetry->gyro_y);
+    USB_CopyFloat(buf, &offset, telemetry->gyro_z);
+    USB_CopyFloat(buf, &offset, telemetry->acc_x);
+    USB_CopyFloat(buf, &offset, telemetry->acc_y);
+    USB_CopyFloat(buf, &offset, telemetry->acc_z);
+    for (i = 0U; i < 4U; i++) USB_CopyFloat(buf, &offset, telemetry->motor_speed[i]);
+    USB_CopyDouble(buf, &offset, telemetry->target_latitude);
+    USB_CopyDouble(buf, &offset, telemetry->target_longitude);
+    USB_CopyDouble(buf, &offset, telemetry->route_latitude);
+    USB_CopyDouble(buf, &offset, telemetry->route_longitude);
+
+    if (offset != (SENSOR_FRAME_SIZE - 1U)) return;
+    for (i = 2U; i < offset; i++) checksum ^= buf[i];
+    buf[offset] = checksum;
+    CDC_Transmit_FS(buf, SENSOR_FRAME_SIZE);
 }

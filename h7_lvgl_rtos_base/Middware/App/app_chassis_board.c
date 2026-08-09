@@ -1440,7 +1440,7 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode)
         case CAR_MODE_GPS_ROS:
             return (chassis_is_gps_online(chassis) &&
                     jetson_online &&
-                    jetson_mode == JETSON_MODE_GPS) ? 1U : 0U;
+                    jetson_mode == JETSON_MODE_GPS_ROS) ? 1U : 0U;
 
         case CAR_MODE_REMOTE:
             return (jetson_online && jetson_mode == JETSON_MODE_REMOTE) ? 1U : 0U;
@@ -1858,20 +1858,11 @@ void chassis_mode_change(chassis_move_t *chassis)
 
     if (!chassis_mode_available(chassis, chassis->mode))
     {
-        if (chassis->mode == CAR_MODE_GPS_ROS && chassis_mode_available(chassis, CAR_MODE_GPS))
-        {
-            Chassis_SetMode(chassis, CAR_MODE_GPS);
-        }
-        else if (chassis->mode != CAR_MODE_IDLE)
+        /* GPS_ROS and GPS_ONLY are independent modes. Never fall back between them. */
+        if (chassis->mode != CAR_MODE_IDLE)
         {
             Chassis_SetMode(chassis, CAR_MODE_IDLE);
         }
-        return;
-    }
-
-    if (chassis->mode == CAR_MODE_GPS && chassis_mode_available(chassis, CAR_MODE_GPS_ROS))
-    {
-        Chassis_SetMode(chassis, CAR_MODE_GPS_ROS);
         return;
     }
 
@@ -1937,11 +1928,20 @@ void chassis_mode_change(chassis_move_t *chassis)
             return;
         }
 
-        if (jetson_mode == JETSON_MODE_GPS)
+        if (jetson_mode == JETSON_MODE_GPS_ROS)
         {
             if (chassis_mode_available(chassis, CAR_MODE_GPS_ROS) && chassis->mode != CAR_MODE_GPS_ROS)
             {
                 Chassis_SetMode(chassis, CAR_MODE_GPS_ROS);
+            }
+            return;
+        }
+
+        if (jetson_mode == JETSON_MODE_GPS_ONLY)
+        {
+            if (chassis_mode_available(chassis, CAR_MODE_GPS) && chassis->mode != CAR_MODE_GPS)
+            {
+                Chassis_SetMode(chassis, CAR_MODE_GPS);
             }
             return;
         }
@@ -2056,9 +2056,9 @@ void chassis_set_control(chassis_move_t *chassis)
             break;
 
         case CAR_MODE_GPS_ROS:
-            if (jetson_online && jetson_mode == JETSON_MODE_GPS && chassis_mode_available(chassis, CAR_MODE_GPS_ROS))
+            if (jetson_online && jetson_mode == JETSON_MODE_GPS_ROS && chassis_mode_available(chassis, CAR_MODE_GPS_ROS))
             {
-                Navigation_Update_Loop_Fusion(chassis);
+                Remote_ROS_Update(chassis);
             }
             else
             {
@@ -2086,10 +2086,134 @@ void chassis_set_control(chassis_move_t *chassis)
     chassis_apply_control_smoothing(chassis);
 }
 
+static uint8_t chassis_telemetry_mode(const chassis_move_t *chassis)
+{
+    switch (chassis->mode)
+    {
+        case CAR_MODE_GPS_ROS:    return JETSON_MODE_GPS_ROS;
+        case CAR_MODE_REMOTE:     return JETSON_MODE_REMOTE;
+        case CAR_MODE_ROS_INDOOR: return JETSON_MODE_INDOOR;
+        case CAR_MODE_GPS:        return JETSON_MODE_GPS_ONLY;
+        default:                  return 0U;
+    }
+}
+
+static void chassis_send_sensor_telemetry(chassis_move_t *chassis)
+{
+    static uint32_t last_send_tick = 0U;
+    static uint16_t sequence = 0U;
+    static uint8_t route_slot = 0U;
+    usb_sensor_telemetry_t telemetry = {0};
+    PT_GNGGA gga;
+    PT_AGRIC agric;
+    uint32_t now = HAL_GetTick();
+    uint8_t agric_fresh;
+    uint8_t gga_fresh;
+
+    if ((uint32_t)(now - last_send_tick) < 50U)
+    {
+        return;
+    }
+    last_send_tick = now;
+    gga = GetGNGGA();
+    agric = GetAGRIC();
+    agric_fresh = (agric != NULL && agric->last_update_tick != 0U &&
+                   (uint32_t)(now - agric->last_update_tick) <= 2000U) ? 1U : 0U;
+    gga_fresh = (gga != NULL && gga->qf != 0U && gga->last_update_tick != 0U &&
+                 (uint32_t)(now - gga->last_update_tick) <= 2500U) ? 1U : 0U;
+
+    telemetry.sequence = ++sequence;
+    telemetry.car_mode = chassis_telemetry_mode(chassis);
+    telemetry.route_total = chassis->nav.total_waypoints;
+    telemetry.navigation_active = chassis->nav.is_navigating;
+    telemetry.loop_enable = chassis->nav.loop_enable;
+
+    if (agric_fresh && agric->Postype != 0U)
+    {
+        telemetry.flags |= USB_SENSOR_FLAG_GPS_VALID;
+        telemetry.latitude = agric->lat;
+        telemetry.longitude = agric->lon;
+        telemetry.altitude = agric->alt;
+        telemetry.fix_quality = agric->Postype;
+        telemetry.satellites = (uint8_t)(agric->NumGPSSta + agric->NumBDSSta +
+                                         agric->NumGLOSta + agric->NumGalSta);
+    }
+    else if (gga_fresh)
+    {
+        telemetry.flags |= USB_SENSOR_FLAG_GPS_VALID;
+        telemetry.latitude = chassis_nmea_to_degree(gga->lat, gga->lat_dir);
+        telemetry.longitude = chassis_nmea_to_degree(gga->lon, gga->lon_dir);
+        telemetry.altitude = (double)gga->Alt;
+        telemetry.fix_quality = gga->qf;
+        telemetry.satellites = gga->sats;
+    }
+
+    if (agric_fresh)
+    {
+        telemetry.gnss_heading = agric->Heading;
+        telemetry.gnss_speed = agric->Speed;
+        telemetry.velocity_north = agric->VelocityOfNorth;
+        telemetry.velocity_east = agric->VelocityOfEast;
+        telemetry.heading_status = agric->HeadingStat;
+        if (agric->HeadingStat != 0U)
+        {
+            telemetry.flags |= USB_SENSOR_FLAG_GNSS_HEAD_VALID;
+        }
+    }
+
+    if (chassis->imu.mag_last_update_tick != 0U &&
+        (uint32_t)(now - chassis->imu.mag_last_update_tick) <= 1000U)
+    {
+        telemetry.flags |= USB_SENSOR_FLAG_MAG_VALID;
+        telemetry.mag_yaw = chassis->imu.mag.yaw;
+        telemetry.mag_pitch = chassis->imu.mag.pitch;
+        telemetry.mag_roll = chassis->imu.mag.roll;
+    }
+
+    if (chassis->imu.jy901s.online)
+    {
+        telemetry.flags |= USB_SENSOR_FLAG_IMU_VALID;
+        telemetry.imu_roll = chassis->imu.jy901s.angle[0];
+        telemetry.imu_pitch = chassis->imu.jy901s.angle[1];
+        telemetry.imu_yaw = chassis->imu.jy901s.angle[2];
+        telemetry.gyro_x = chassis->imu.jy901s.gyro[0];
+        telemetry.gyro_y = chassis->imu.jy901s.gyro[1];
+        telemetry.gyro_z = chassis->imu.jy901s.gyro[2];
+        telemetry.acc_x = chassis->imu.jy901s.acc[0];
+        telemetry.acc_y = chassis->imu.jy901s.acc[1];
+        telemetry.acc_z = chassis->imu.jy901s.acc[2];
+    }
+
+    for (uint8_t i = 0U; i < 4U; i++)
+    {
+        telemetry.motor_speed[i] = (float)chassis->motor[i].speed;
+    }
+
+    if (chassis->nav.total_waypoints > 0U)
+    {
+        telemetry.flags |= USB_SENSOR_FLAG_TARGET_VALID | USB_SENSOR_FLAG_ROUTE_VALID;
+        telemetry.target_latitude = chassis->nav.target_pos.lat;
+        telemetry.target_longitude = chassis->nav.target_pos.lon;
+        if (route_slot >= chassis->nav.total_waypoints)
+        {
+            route_slot = 0U;
+        }
+        telemetry.route_slot = route_slot;
+        telemetry.route_latitude = chassis->nav.route[route_slot].lat;
+        telemetry.route_longitude = chassis->nav.route[route_slot].lon;
+        route_slot++;
+    }
+    else
+    {
+        route_slot = 0U;
+    }
+
+    USB_SendSensorTelemetry(&telemetry);
+}
+
 /* ============================================================
  *  Step 5: Send chassis control commands.
- *    IDLE mode: clear motors + send telemetry.
- *    Normal mode: PID output -> motor PWM + USB telemetry to Jetson.
+ *    Motor output remains at 100 Hz; sensor telemetry is limited to 20 Hz.
  * ============================================================ */
 void chassis_send_cmd(chassis_move_t *chassis)
 {
@@ -2101,9 +2225,7 @@ void chassis_send_cmd(chassis_move_t *chassis)
     {
         g_chassis_powerless_debug = 1U;
         chassis_force_powerless_output(chassis);
-        USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
-                          chassis->date_to_usb.current_lat,
-                          chassis->date_to_usb.current_lon);
+        chassis_send_sensor_telemetry(chassis);
         return;
     }
 
@@ -2115,9 +2237,7 @@ void chassis_send_cmd(chassis_move_t *chassis)
         {
             Motor_SetPWM(0, i);
         }
-        USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
-                          chassis->date_to_usb.current_lat,
-                          chassis->date_to_usb.current_lon);
+        chassis_send_sensor_telemetry(chassis);
         return;
     }
 
@@ -2126,9 +2246,7 @@ void chassis_send_cmd(chassis_move_t *chassis)
         Motor_SetPWM((int16_t)chassis->motor[i].speed_pid.Out, i);
     }
 
-    USB_SendTelemetry(chassis->date_to_usb.heading_to_target_deg,
-                      chassis->date_to_usb.current_lat,
-                      chassis->date_to_usb.current_lon);
+    chassis_send_sensor_telemetry(chassis);
 }
 
 /* ============================================================
