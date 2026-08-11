@@ -31,15 +31,14 @@ void QMC5883_SetCalibrationStepCallback(QMC5883_CalibrationStepCallback_t callba
 }
 
 /**
- * Initialize the QMC5883 magnetometer.
- * Configures control registers for continuous measurement mode (200 Hz ODR,
- * +/- 2 Gauss range, 512 OSR) and runs a 30-second calibration routine.
+ * Initialize QMC5883 hardware only (registers + safe defaults, no calibration).
+ * Call at power-up so magnetic data is available on the GUI immediately.
+ * Defer Magnetometer_Calibration() until the vehicle is ready to rotate.
  */
-void QMC5883_Init(void)
+void QMC5883_InitHW(void)
 {
-    
     uint8_t data;
-    
+
     data = 0x0D;
     HAL_I2C_Mem_Write(&hi2c1, QMC5883_ADDR, 0x09, I2C_MEMADD_SIZE_8BIT, &data, 1, 100);
     data = 0x01;
@@ -48,12 +47,21 @@ void QMC5883_Init(void)
     HAL_I2C_Mem_Write(&hi2c1, QMC5883_ADDR, 0x20, I2C_MEMADD_SIZE_8BIT, &data, 1, 100);
     data = 0x01;
     HAL_I2C_Mem_Write(&hi2c1, QMC5883_ADDR, 0x21, I2C_MEMADD_SIZE_8BIT, &data, 1, 100);
-    
+
     /* Safe defaults before calibration completes */
     params.offset_x = 0; params.offset_y = 0; params.offset_z = 0;
     params.scale_x = 1.0f; params.scale_y = 1.0f; params.scale_z = 1.0f;
-		QMC5883_DebugSyncCalibration();
-		Magnetometer_Calibration();  /* Start 30s calibration */
+    QMC5883_DebugSyncCalibration();
+}
+
+/**
+ * Initialize QMC5883 (register config + 30-second calibration).
+ * Legacy wrapper calling InitHW + Magnetometer_Calibration.
+ */
+void QMC5883_Init(void)
+{
+    QMC5883_InitHW();
+    Magnetometer_Calibration();  /* Start 30s calibration */
 }
 
 /**

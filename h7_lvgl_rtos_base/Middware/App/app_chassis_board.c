@@ -90,6 +90,7 @@ static volatile int gui_req_mode = -1;
 static uint8_t chassis_manual_indoor_mode = 0U;
 static volatile uint8_t chassis_init_done = 0U;
 static char chassis_init_status[64] = "\xE7\xAD\x89\xE5\xBE\x85\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96";
+static uint8_t chassis_mag_hw_ready = 0U;
 static uint8_t chassis_mag_initialized = 0U;
 static uint8_t chassis_mag_initializing = 0U;
 static float chassis_smoothed_vx = 0.0f;
@@ -1345,7 +1346,7 @@ static void chassis_init_magnetometer_once(chassis_move_t *chassis)
     chassis_mag_initializing = 1U;
     chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96QMC5883");
     QMC5883_SetCalibrationStepCallback(chassis_mag_calibration_step);
-    QMC5883_Init();
+    Magnetometer_Calibration();
     QMC5883_SetCalibrationStepCallback(NULL);
     Motor_SetAllPWM(0, 0, 0, 0);
     chassis_stop(chassis);
@@ -1626,8 +1627,9 @@ void chassis_feedback_update(chassis_move_t *chassis)
 
     now = HAL_GetTick();
 
-    /* Magnetometer remains untouched until the first GPS-class mode. */
-    if (chassis_mag_initialized)
+    /* Magnetometer: read every cycle after hardware init at power-up.
+       Default calibration (offset=0, scale=1) until first GPS entry. */
+    if (chassis_mag_hw_ready)
     {
         QMC5883_GetAngles(&chassis->imu.mag);
         chassis->imu.mag_last_update_tick = chassis->imu.mag.last_update_tick;
@@ -1752,6 +1754,9 @@ static void chassis_init(chassis_move_t *chassis)
     uart_init(&huart2, UART_DMA_ToIdle_RX);
     chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96JY901S");
     JY901S_Init();
+    chassis_set_init_status("\xE6\xAD\xA3\xE5\x9C\xA8\xE5\x88\x9D\xE5\xA7\x8B\xE5\x8C\x96QMC5883");
+    QMC5883_InitHW();
+    chassis_mag_hw_ready = 1U;
 
     /*
      * 路面识别只维护自己的 NanoEdge 缓冲和结果快照。即使模型初始化失败，

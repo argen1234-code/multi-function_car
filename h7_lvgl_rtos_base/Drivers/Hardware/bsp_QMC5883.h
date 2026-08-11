@@ -53,6 +53,9 @@ typedef struct {
     CalibParams calibration;
 } QMC5883_Debug_t;
 
+/* Initialize QMC5883 hardware only (registers + safe defaults, no calibration). */
+void QMC5883_InitHW(void);
+
 /* Initialize QMC5883: configure registers and run 30-second calibration. */
 void QMC5883_Init(void);
 
