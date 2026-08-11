@@ -221,7 +221,9 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     PT_GNGGA pGGA = GetGNGGA();
     PT_GPHPR pHPR = GetGPHPR();
 
-    if (pGGA->qf < 1 || pGGA->lat < 1.0f) {
+    if (pGGA->qf < 1 || pGGA->lat < 1.0f ||
+        pGGA->last_update_tick == 0U ||
+        (HAL_GetTick() - pGGA->last_update_tick) > 3000U) {
         /* 定位无效 → 强制停车 */
         chassis->Vx_set = 0.0f;
         chassis->Vy_set = 0.0f;
