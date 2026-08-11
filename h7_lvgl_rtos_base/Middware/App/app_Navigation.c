@@ -230,6 +230,17 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
         return;
     }
 
+    /* 磁力计是纯GPS航向唯一可信来源；掉线或数据过期时禁止驱动。 */
+    if (chassis->imu.mag_last_update_tick == 0U ||
+        (HAL_GetTick() - chassis->imu.mag_last_update_tick) > 1000U)
+    {
+        chassis->Vx_set = 0.0f;
+        chassis->Vy_set = 0.0f;
+        chassis->Wz_set = 0.0f;
+        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
+        return;
+    }
+
     nav->rtk_quality  = pGGA->qf;
     nav->current_pos.lat = NMEA_To_Degree(pGGA->lat);
     nav->current_pos.lon = NMEA_To_Degree(pGGA->lon);

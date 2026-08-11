@@ -118,6 +118,8 @@ volatile uint8_t g_chassis_powerless_debug = 0U;
 volatile ChassisJY901SDebug_t g_chassis_jy901s_debug;
 
 static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode);
+static uint8_t chassis_is_gps_online(chassis_move_t *chassis);
+static uint8_t chassis_is_mag_online(chassis_move_t *chassis);
 static uint8_t chassis_is_moving_for_road_classification(const chassis_move_t *chassis);
 static void chassis_mag_calibration_step(uint32_t elapsed_ms);
 static void chassis_load_gps_route_from_flash(void);
@@ -1236,10 +1238,18 @@ static void chassis_process_usb_gps_route(chassis_move_t *chassis)
 
     if (chassis != NULL && chassis->mode == CAR_MODE_GPS)
     {
-        if (chassis_usb_route_loop_enable)
-            Navigation_Set_Route_Loop(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+        if (chassis_is_gps_online(chassis) && chassis_is_mag_online(chassis))
+        {
+            if (chassis_usb_route_loop_enable)
+                Navigation_Set_Route_Loop(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+            else
+                Navigation_Set_Route(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+        }
         else
-            Navigation_Set_Route(&chassis->nav, chassis_gps_route, chassis_gps_route_count);
+        {
+            /* Do not allow an older active route to resume when sensors recover. */
+            Navigation_Stop(chassis);
+        }
     }
     chassis_persist_gps_route();
     chassis_usb_route_expected_count = 0U;
@@ -1500,6 +1510,16 @@ static uint8_t chassis_is_gps_online(chassis_move_t *chassis)
     return (tick != 0U && (HAL_GetTick() - tick) <= GPS_ONLINE_TIMEOUT_MS) ? 1U : 0U;
 }
 
+static uint8_t chassis_is_mag_online(chassis_move_t *chassis)
+{
+    uint32_t tick;
+
+    if (chassis == NULL) return 0U;
+
+    tick = chassis->imu.mag_last_update_tick;
+    return (tick != 0U && (HAL_GetTick() - tick) <= 1000U) ? 1U : 0U;
+}
+
 static uint8_t chassis_is_bt_online(void)
 {
     return (BT_IsOnline() || BT_IsActive()) ? 1U : 0U;
@@ -1527,7 +1547,11 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode)
             return 1U;
 
         case CAR_MODE_GPS:
-            return chassis_is_gps_online(chassis);
+            /* Jetson may enter pure-GPS mode before an outdoor fix exists;
+             * Navigation_Update_Loop() will keep the chassis stopped until
+             * GPS and magnetometer data are both valid. */
+            return ((jetson_online && jetson_mode == JETSON_MODE_GPS_ONLY) ||
+                    chassis_is_gps_online(chassis)) ? 1U : 0U;
 
         case CAR_MODE_GPS_ROS:
             return (chassis_is_gps_online(chassis) &&
