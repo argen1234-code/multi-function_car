@@ -225,10 +225,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
         pGGA->last_update_tick == 0U ||
         (HAL_GetTick() - pGGA->last_update_tick) > 3000U) {
         /* 定位无效 → 强制停车 */
-        chassis->Vx_set = 0.0f;
-        chassis->Vy_set = 0.0f;
-        chassis->Wz_set = 0.0f;
-        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
+        Navigation_Stop(chassis);
         return;
     }
 
@@ -236,10 +233,7 @@ void Navigation_Update_Loop(struct chassis_move_s *chassis)
     if (chassis->imu.mag_last_update_tick == 0U ||
         (HAL_GetTick() - chassis->imu.mag_last_update_tick) > 1000U)
     {
-        chassis->Vx_set = 0.0f;
-        chassis->Vy_set = 0.0f;
-        chassis->Wz_set = 0.0f;
-        Navigation_DebugSync(chassis, GPS_DEBUG_NAV_MODE_PURE);
+        Navigation_Stop(chassis);
         return;
     }
 
