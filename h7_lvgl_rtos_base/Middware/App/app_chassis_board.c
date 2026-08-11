@@ -1548,11 +1548,13 @@ static uint8_t chassis_mode_available(chassis_move_t *chassis, CarMode_t mode)
             return 1U;
 
         case CAR_MODE_GPS:
-            /* Jetson may enter pure-GPS mode before an outdoor fix exists;
-             * Navigation_Update_Loop() will keep the chassis stopped until
-             * GPS and magnetometer data are both valid. */
-            return ((jetson_online && jetson_mode == JETSON_MODE_GPS_ONLY) ||
-                    chassis_is_gps_online(chassis)) ? 1U : 0U;
+            /* Pure-GPS mode is also the explicit magnetometer-calibration
+             * entry point.  Allow it before a GPS fix exists; navigation
+             * itself still refuses to move until GPS and magnetometer data
+             * are valid. */
+            (void)jetson_online;
+            (void)jetson_mode;
+            return 1U;
 
         case CAR_MODE_GPS_ROS:
             return (chassis_is_gps_online(chassis) &&
@@ -1592,7 +1594,9 @@ static void Chassis_SetMode(chassis_move_t *chassis, CarMode_t mode)
     was_nav_mode = (chassis->mode == CAR_MODE_GPS || chassis->mode == CAR_MODE_GPS_ROS) ? 1U : 0U;
     is_nav_mode = (mode == CAR_MODE_GPS || mode == CAR_MODE_GPS_ROS) ? 1U : 0U;
 
-    if (is_nav_mode)
+    /* Only pure GPS entry starts the one-time rotating calibration.  GPS+ROS
+       keeps the power-up stream and does not rotate the vehicle implicitly. */
+    if (mode == CAR_MODE_GPS)
     {
         chassis_init_magnetometer_once(chassis);
     }
